@@ -30,6 +30,7 @@ model User {
   eventRsvps EventRsvp[]
   reports   Report[]
   swipeActions SwipeAction[]
+  sentMessages Message[] @relation("SenderMessages")
   matches1  Match[] @relation("MatchUser1")
   matches2  Match[] @relation("MatchUser2")
 }
@@ -84,6 +85,7 @@ model Message {
   id       String @id @default(cuid())
   matchId  String
   senderId String
+  sender   User   @relation("SenderMessages", fields: [senderId], references: [id])
   content  String
   type     MessageType @default(TEXT)
   read     Boolean @default(false)
