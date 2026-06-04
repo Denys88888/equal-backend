@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsNotEmpty } from 'class-validator';
+import { IsString, IsArray, IsOptional, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class PiLoginDto {
@@ -7,8 +7,9 @@ export class PiLoginDto {
   @IsNotEmpty()
   accessToken!: string;
 
-  @ApiProperty({ description: 'Granted scopes', example: ['username', 'payments'] })
+  @ApiProperty({ description: 'Granted scopes', example: ['username', 'payments'], required: false })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  scopes!: string[];
+  scopes?: string[];
 }

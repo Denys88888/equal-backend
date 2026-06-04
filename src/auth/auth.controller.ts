@@ -14,6 +14,7 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async piLogin(@Body() dto: PiLoginDto) {
-    return this.svc.piLogin(dto.accessToken, dto.scopes);
+    console.log('[AUTH] piLogin called, accessToken present:', !!dto.accessToken, 'scopes:', dto.scopes);
+    return this.svc.piLogin(dto.accessToken, dto.scopes || []);
   }
 }
