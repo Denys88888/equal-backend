@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.env
+.env.*
+!.env.example
+package-lock.json
+yarn.lock
+*.log
+.DS_Store
+coverage/
+.vscode/
+.idea/

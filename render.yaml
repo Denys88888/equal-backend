@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: equal-backend
+    runtime: docker
+    plan: starter
+    branch: main
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: equal-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    healthCheckPath: /v1
+
+databases:
+  - name: equal-db
+    plan: starter
+    postgresMajorVersion: 16

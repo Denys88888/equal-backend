@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  password     String?
+  piUid        String?  @unique
+  name         String
+  username     String   @unique
+  avatar       String?
+  role         Role     @default(USER)
+  verified     Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  trustScore   Int      @default(50)
+  sparkBalance Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile      Profile?
+  photos       Photo[]
+  matchesAsUser1 Match[] @relation("MatchUser1")
+  matchesAsUser2 Match[] @relation("MatchUser2")
+}
+
+model Profile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  bio               String?
+  birthDate         DateTime?
+  city              String?
+  latitude          Float?
+  longitude         Float?
+  gender            String?
+  lookingFor        String[]
+  goals             String[]
+  interests         String[]
+  trustScore        Int      @default(50)
+  completionPercent Int      @default(0)
+  profileComplete   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Photo {
+  id      String  @id @default(cuid())
+  userId  String
+  url     String
+  isMain  Boolean @default(false)
+  order   Int     @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  user1Id   String
+  user2Id   String
+  createdAt DateTime @default(now())
+  messages  Message[]
+  user1     User     @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User     @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id       String      @id @default(cuid())
+  matchId  String
+  senderId String
+  content  String
+  type     MessageType @default(TEXT)
+  read     Boolean     @default(false)
+  createdAt DateTime   @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
+
+model SwipeAction {
+  id        String   @id @default(cuid())
+  userId    String
+  targetId  String
+  action    String
+  createdAt DateTime @default(now())
+}
+
+model Club {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  icon        String?
+  createdAt   DateTime @default(now())
+
+  members ClubMember[]
+  posts   ClubPost[]
+}
+
+model ClubMember {
+  id     String   @id @default(cuid())
+  clubId String
+  userId String
+  role   ClubRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+}
+
+model ClubPost {
+  id       String @id @default(cuid())
+  clubId   String
+  authorId String
+  content  String
+  createdAt DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  location    String?
+  city        String?
+  category    String?
+  price       Float    @default(0)
+  maxAttendees Int?
+  createdAt   DateTime @default(now())
+
+  rsvps EventRsvp[]
+}
+
+model EventRsvp {
+  id       String     @id @default(cuid())
+  eventId  String
+  userId   String
+  status   RsvpStatus @default(GOING)
+  createdAt DateTime  @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  targetId    String
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MessageType {
+  TEXT
+  VOICE
+  GIFT
+  SYSTEM
+}
+
+enum ClubRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum RsvpStatus {
+  GOING
+  INTERESTED
+  NOT_GOING
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
