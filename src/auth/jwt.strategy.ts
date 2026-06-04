@@ -9,6 +9,12 @@ export interface JwtPayload {
   role: Role;
 }
 
+export interface AuthenticatedUser {
+  userId: string;
+  piUid: string;
+  role: Role;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {

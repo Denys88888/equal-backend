@@ -1,9 +1,5 @@
-import {
-  Module,
-  APP_GUARD,
-  NestModule,
-  MiddlewareConsumer,
-} from '@nestjs/core';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
