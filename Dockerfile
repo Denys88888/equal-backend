@@ -2,11 +2,17 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Clear npm and Docker cache (fixes Render cache errors)
+# Cache bust: increment this number to force fresh build
+ARG CACHE_BUST=2
+
+RUN npm cache clean --force
+
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
 # Copy package files
-COPY package.json package-lock.json* ./
+COPY package.json ./
 
 # Install ALL dependencies (including devDependencies for build)
 RUN npm install
