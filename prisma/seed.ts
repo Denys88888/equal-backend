@@ -4,8 +4,7 @@ const prisma: PrismaClient = new PrismaClient();
 
 interface SeedUser {
   id: string;
-  email: string;
-  password: string;
+  piUid: string;
   name: string;
   username: string;
   avatar: string;
@@ -63,8 +62,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_001',
-        email: 'alice@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_alice_001',
         name: 'Alice Johnson',
         username: 'alicej',
         avatar: 'https://picsum.photos/seed/alice/200',
@@ -94,8 +92,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_002',
-        email: 'bob@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_bob_002',
         name: 'Bob Smith',
         username: 'bobsmith',
         avatar: 'https://picsum.photos/seed/bob/200',
@@ -125,8 +122,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_003',
-        email: 'charlie@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_charlie_003',
         name: 'Charlie Brown',
         username: 'charlieb',
         avatar: 'https://picsum.photos/seed/charlie/200',
@@ -155,8 +151,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_004',
-        email: 'diana@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_diana_004',
         name: 'Diana Prince',
         username: 'dianap',
         avatar: 'https://picsum.photos/seed/diana/200',
@@ -187,8 +182,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_005',
-        email: 'ethan@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_ethan_005',
         name: 'Ethan Hunt',
         username: 'ethanh',
         avatar: 'https://picsum.photos/seed/ethan/200',
@@ -218,8 +212,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_006',
-        email: 'fiona@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_fiona_006',
         name: 'Fiona Gallagher',
         username: 'fionag',
         avatar: 'https://picsum.photos/seed/fiona/200',
@@ -248,8 +241,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_007',
-        email: 'george@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_george_007',
         name: 'George Martin',
         username: 'georgem',
         avatar: 'https://picsum.photos/seed/george/200',
@@ -279,8 +271,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_008',
-        email: 'hannah@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_hannah_008',
         name: 'Hannah Montana',
         username: 'hannahm',
         avatar: 'https://picsum.photos/seed/hannah/200',
@@ -310,8 +301,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_009',
-        email: 'ian@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_ian_009',
         name: 'Ian Somerhalder',
         username: 'ians',
         avatar: 'https://picsum.photos/seed/ian/200',
@@ -340,8 +330,7 @@ async function main(): Promise<void> {
     {
       user: {
         id: 'user_010',
-        email: 'julia@example.com',
-        password: '$2b$10$hashedpassword',
+        piUid: 'pi_julia_010',
         name: 'Julia Roberts',
         username: 'juliar',
         avatar: 'https://picsum.photos/seed/julia/200',
