@@ -39,12 +39,6 @@ export class UsersService {
     });
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
-    });
-  }
-
   async findPublicProfile(userId: string): Promise<PublicProfile> {
     const user: UserWithRelations | null = await this.prisma.user.findUnique({
       where: { id: userId },

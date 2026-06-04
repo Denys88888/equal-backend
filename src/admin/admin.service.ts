@@ -13,7 +13,6 @@ export class AdminService {
   ): Promise<{
     data: Array<{
       id: string;
-      email: string | null;
       name: string;
       username: string;
       role: Role;
@@ -29,7 +28,7 @@ export class AdminService {
     const whereClause: {
       OR?: Array<
         | { name: { contains: string; mode: 'insensitive' } }
-        | { email: { contains: string; mode: 'insensitive' } }
+        | { piUid: { contains: string; mode: 'insensitive' } }
         | { username: { contains: string; mode: 'insensitive' } }
       >;
     } = {};
@@ -37,7 +36,7 @@ export class AdminService {
     if (search && search.trim().length > 0) {
       whereClause.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
+        { piUid: { contains: search, mode: 'insensitive' } },
         { username: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -45,7 +44,6 @@ export class AdminService {
     const [users, total]: [
       Array<{
         id: string;
-        email: string | null;
         name: string;
         username: string;
         role: Role;
@@ -60,7 +58,6 @@ export class AdminService {
         where: whereClause,
         select: {
           id: true,
-          email: true,
           name: true,
           username: true,
           role: true,
@@ -89,7 +86,6 @@ export class AdminService {
 
   async findUserById(id: string): Promise<{
     id: string;
-    email: string | null;
     name: string;
     username: string;
     role: Role;
@@ -112,7 +108,6 @@ export class AdminService {
   }> {
     const user: {
       id: string;
-      email: string | null;
       name: string;
       username: string;
       role: Role;
@@ -141,7 +136,6 @@ export class AdminService {
       where: { id },
       select: {
         id: true,
-        email: true,
         name: true,
         username: true,
         role: true,

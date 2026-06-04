@@ -27,7 +27,6 @@ import { Role } from '@prisma/client';
 interface AdminRequest {
   user: {
     id: string;
-    email?: string | null;
     role: Role;
   };
 }
@@ -64,7 +63,6 @@ export class AdminController {
   ): Promise<{
     data: Array<{
       id: string;
-      email: string | null;
       name: string;
       username: string;
       role: Role;
@@ -90,7 +88,6 @@ export class AdminController {
     @Req() req: AdminRequest,
   ): Promise<{
     id: string;
-    email: string | null;
     name: string;
     username: string;
     role: Role;
