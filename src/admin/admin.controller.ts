@@ -9,6 +9,7 @@ import {
   ForbiddenException,
   ParseIntPipe,
   DefaultValuePipe,
+  Req,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -42,7 +43,7 @@ export class AdminController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('search') search: string,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{
     data: Array<{
       id: string;
@@ -64,7 +65,7 @@ export class AdminController {
   @Get('users/:id')
   async findUserById(
     @Param('id') id: string,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{
     id: string;
     email: string | null;
@@ -96,7 +97,7 @@ export class AdminController {
   async updateRole(
     @Param('id') id: string,
     @Body() body: UpdateRoleDto,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{ id: string; role: Role }> {
     this.checkAdmin(req);
     return this.adminService.updateRole(id, body.role);
@@ -105,7 +106,7 @@ export class AdminController {
   @Patch('users/:id/verify')
   async toggleVerify(
     @Param('id') id: string,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{ id: string; verified: boolean }> {
     this.checkAdmin(req);
     return this.adminService.toggleVerify(id);
@@ -113,7 +114,7 @@ export class AdminController {
 
   @Get('reports')
   async findReports(
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<
     Array<{
       id: string;
@@ -132,7 +133,7 @@ export class AdminController {
   @Patch('reports/:id/resolve')
   async resolveReport(
     @Param('id') id: string,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{ id: string; status: string }> {
     this.checkAdmin(req);
     return this.adminService.resolveReport(id);
@@ -141,7 +142,7 @@ export class AdminController {
   @Patch('reports/:id/dismiss')
   async dismissReport(
     @Param('id') id: string,
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{ id: string; status: string }> {
     this.checkAdmin(req);
     return this.adminService.dismissReport(id);
@@ -149,7 +150,7 @@ export class AdminController {
 
   @Get('stats')
   async getStats(
-    req: AdminRequest,
+    @Req() req: AdminRequest,
   ): Promise<{
     totalUsers: number;
     totalMatches: number;

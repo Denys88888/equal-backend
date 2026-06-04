@@ -27,6 +27,9 @@ model User {
   photos       Photo[]
   matchesAsUser1 Match[] @relation("MatchUser1")
   matchesAsUser2 Match[] @relation("MatchUser2")
+  clubMembers  ClubMember[]
+  clubPosts    ClubPost[]
+  eventRsvps   EventRsvp[]
 }
 
 model Profile {
@@ -108,9 +111,8 @@ model ClubMember {
   userId String
   role   ClubRole @default(MEMBER)
   joinedAt DateTime @default(now())
-
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
-
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([clubId, userId])
 }
 
@@ -120,8 +122,8 @@ model ClubPost {
   authorId String
   content  String
   createdAt DateTime @default(now())
-
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 }
 
 model Event {
@@ -145,9 +147,8 @@ model EventRsvp {
   userId   String
   status   RsvpStatus @default(GOING)
   createdAt DateTime  @default(now())
-
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([eventId, userId])
 }
 

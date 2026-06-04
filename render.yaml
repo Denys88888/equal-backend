@@ -16,7 +16,7 @@ services:
         value: production
       - key: PORT
         value: 3000
-    healthCheckPath: /v1
+    healthCheckPath: /v1/health
 
 databases:
   - name: equal-db

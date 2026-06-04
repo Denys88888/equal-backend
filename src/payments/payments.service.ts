@@ -30,7 +30,13 @@ export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private getApiKey(): string {
-    return process.env.PI_API_KEY || '';
+    const apiKey = process.env.PI_API_KEY;
+    if (!apiKey) {
+      throw new UnauthorizedException(
+        'PI_API_KEY environment variable is not configured',
+      );
+    }
+    return apiKey;
   }
 
   private async callPlatformApi(
@@ -38,10 +44,6 @@ export class PaymentsService {
     body: unknown,
   ): Promise<unknown> {
     const apiKey = this.getApiKey();
-    if (!apiKey) {
-      // In development without API key, mock the response
-      return { approved: true };
-    }
     const response = await fetch(`${this.platformApiUrl}${endpoint}`, {
       method: 'POST',
       headers: {

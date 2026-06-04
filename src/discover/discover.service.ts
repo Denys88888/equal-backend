@@ -110,17 +110,16 @@ export class DiscoverService {
             name: true,
             avatar: true,
           },
-        },
-        photos: {
-          orderBy: { order: 'asc' },
+          include: {
+            photos: { orderBy: { order: 'asc' } },
+          },
         },
       },
       skip,
       take: limit,
     })) as Array<
       Profile & {
-        user: { id: string; name: string; avatar: string | null };
-        photos: Photo[];
+        user: { id: string; name: string; avatar: string | null; photos: Photo[] };
       }
     >;
 
@@ -149,7 +148,7 @@ export class DiscoverService {
         city: profile.city,
         interests: profile.interests,
         trustScore: profile.trustScore,
-        photos: profile.photos,
+        photos: profile.user.photos,
         compatibilityScore,
       };
     });

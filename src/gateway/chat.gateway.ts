@@ -80,6 +80,16 @@ export class ChatGateway
   ): Promise<ChatMessageResponse> {
     const { matchId, senderId, content, type }: SendMessagePayload = payload;
 
+    // Validate that senderId is part of the match
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { user1Id: true, user2Id: true },
+    });
+
+    if (!match || (match.user1Id !== senderId && match.user2Id !== senderId)) {
+      throw new Error('Sender is not a participant in this match');
+    }
+
     const messageType: MessageType = type ?? MessageType.TEXT;
 
     const savedMessage: {

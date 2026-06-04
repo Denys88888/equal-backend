@@ -15,6 +15,7 @@ import { SparksModule } from './sparks/sparks.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { GatewayModule } from './gateway/gateway.module';
     PaymentsModule,
     AdminModule,
     GatewayModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
