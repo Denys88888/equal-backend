@@ -20,7 +20,7 @@ services:
       - key: NPM_CONFIG_CACHE
         value: /tmp/npm-cache
       - key: PI_API_KEY
-        value: e85da77a0d4407fc313b8db1d36fc02160aded43d381430b2e536ab04e3a75d7725830a07fb6bd2ac99bd12d889d7c0cd6d4b59c90d237645d91cdc432dae5dd
+        value: h1p5wbaq0kgnnyhhpir0ngt0ozvltsifveghqfpwmxxnbau1fju0kajg0u6ferap
     healthCheckPath: /v1/health
 
 databases:
