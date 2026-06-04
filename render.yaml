@@ -1,10 +1,11 @@
 services:
   - type: web
     name: equal-backend
-    runtime: docker
+    runtime: node
     plan: starter
     branch: main
-    dockerfilePath: ./Dockerfile
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -16,6 +17,8 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: NPM_CONFIG_CACHE
+        value: /tmp/npm-cache
     healthCheckPath: /v1/health
 
 databases:
