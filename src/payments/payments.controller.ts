@@ -85,7 +85,7 @@ export class PaymentsController {
   async getIncomplete(
     @Req() req: AuthenticatedRequest,
   ): Promise<{ payments: PaymentRecord[] }> {
-    const payments = this.paymentsService.findIncompletePayments(
+    const payments = await this.paymentsService.findIncompletePayments(
       req.user.userId,
     );
     return { payments };

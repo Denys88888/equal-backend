@@ -28,6 +28,7 @@ model User {
   clubMembers  ClubMember[]
   clubPosts    ClubPost[]
   eventRsvps   EventRsvp[]
+  payments     Payment[]
 }
 
 model Profile {
@@ -150,6 +151,21 @@ model EventRsvp {
   @@unique([eventId, userId])
 }
 
+model Payment {
+  id        String        @id @default(cuid())
+  identifier String       @unique
+  userId    String
+  amount    Float
+  memo      String
+  matchId   String
+  txid      String?
+  status    PaymentStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Report {
   id          String       @id @default(cuid())
   reporterId  String
@@ -182,6 +198,13 @@ enum RsvpStatus {
   GOING
   INTERESTED
   NOT_GOING
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
 }
 
 enum ReportStatus {

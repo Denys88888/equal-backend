@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentStatus } from '@prisma/client';
 
 export interface PaymentRecord {
   identifier: string;
@@ -24,7 +25,6 @@ interface PiPaymentData {
 
 @Injectable()
 export class PaymentsService {
-  private readonly payments: Map<string, PaymentRecord> = new Map();
   private readonly platformApiUrl = 'https://api.minepi.com/v2';
 
   constructor(private readonly prisma: PrismaService) {}
@@ -59,35 +59,64 @@ export class PaymentsService {
     return response.json();
   }
 
-  createPayment(
+  private toRecord(p: {
+    identifier: string;
+    userId: string;
+    amount: number;
+    memo: string;
+    matchId: string;
+    txid: string | null;
+    status: PaymentStatus;
+    createdAt: Date;
+  }): PaymentRecord {
+    return {
+      identifier: p.identifier,
+      user_id: p.userId,
+      amount: p.amount,
+      memo: p.memo,
+      metadata: { matchId: p.matchId },
+      txid: p.txid ?? undefined,
+      status: p.status.toLowerCase() as PaymentRecord['status'],
+      created_at: p.createdAt.toISOString(),
+    };
+  }
+
+  async createPayment(
     userId: string,
     amount: number,
     memo: string,
     matchId: string,
-  ): PaymentRecord {
+  ): Promise<PaymentRecord> {
     const identifier = `equal-payment-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const payment: PaymentRecord = {
-      identifier,
-      user_id: userId,
-      amount,
-      memo,
-      metadata: { matchId },
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    };
-    this.payments.set(identifier, payment);
-    return payment;
+    const payment = await this.prisma.payment.create({
+      data: {
+        identifier,
+        userId,
+        amount,
+        memo,
+        matchId,
+        status: PaymentStatus.PENDING,
+      },
+    });
+    return this.toRecord(payment);
   }
 
   async approvePayment(paymentId: string): Promise<{ approved: boolean }> {
-    const payment = this.payments.get(paymentId);
+    const payment = await this.prisma.payment.findUnique({
+      where: { identifier: paymentId },
+    });
     if (!payment) throw new NotFoundException('Payment not found');
 
     await this.callPlatformApi(`/payments/${paymentId}/approve`, {
       paymentId,
+      developer_authorized: true,
     });
-    payment.status = 'approved';
-    this.payments.set(paymentId, payment);
+
+    await this.prisma.payment.update({
+      where: { identifier: paymentId },
+      data: { status: PaymentStatus.APPROVED },
+    });
+
     return { approved: true };
   }
 
@@ -95,39 +124,38 @@ export class PaymentsService {
     paymentId: string,
     txid: string,
   ): Promise<{ completed: boolean }> {
-    const payment = this.payments.get(paymentId);
+    const payment = await this.prisma.payment.findUnique({
+      where: { identifier: paymentId },
+    });
     if (!payment) throw new NotFoundException('Payment not found');
 
     await this.callPlatformApi(`/payments/${paymentId}/complete`, {
       paymentId,
       txid,
+      developer_authorized: true,
     });
-    payment.status = 'completed';
-    payment.txid = txid;
-    this.payments.set(paymentId, payment);
+
+    await this.prisma.payment.update({
+      where: { identifier: paymentId },
+      data: { status: PaymentStatus.COMPLETED, txid },
+    });
+
     return { completed: true };
   }
 
-  getHistory(userId: string): PaymentRecord[] {
-    const userPayments: PaymentRecord[] = [];
-    for (const payment of this.payments.values()) {
-      if (payment.user_id === userId) {
-        userPayments.push(payment);
-      }
-    }
-    return userPayments.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+  async getHistory(userId: string): Promise<PaymentRecord[]> {
+    const payments = await this.prisma.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return payments.map((p) => this.toRecord(p));
   }
 
-  findIncompletePayments(userId: string): PaymentRecord[] {
-    const incomplete: PaymentRecord[] = [];
-    for (const payment of this.payments.values()) {
-      if (payment.user_id === userId && payment.status === 'pending') {
-        incomplete.push(payment);
-      }
-    }
-    return incomplete;
+  async findIncompletePayments(userId: string): Promise<PaymentRecord[]> {
+    const payments = await this.prisma.payment.findMany({
+      where: { userId, status: PaymentStatus.PENDING },
+      orderBy: { createdAt: 'desc' },
+    });
+    return payments.map((p) => this.toRecord(p));
   }
 }
