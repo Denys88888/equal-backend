@@ -11,6 +11,15 @@ import {
   DefaultValuePipe,
   Req,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Role } from '@prisma/client';
@@ -23,10 +32,12 @@ interface AdminRequest {
   };
 }
 
-interface UpdateRoleDto {
-  role: Role;
+class UpdateRoleDto {
+  role!: Role;
 }
 
+@ApiTags('Admin')
+@ApiBearerAuth()
 @Controller('admin')
 @UseGuards(JwtAuthGuard)
 export class AdminController {
@@ -39,6 +50,12 @@ export class AdminController {
   }
 
   @Get('users')
+  @ApiOperation({ summary: 'List all users (admin only)' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search query' })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async findUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
@@ -63,6 +80,11 @@ export class AdminController {
   }
 
   @Get('users/:id')
+  @ApiOperation({ summary: 'Get user details by ID (admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User details retrieved' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   async findUserById(
     @Param('id') id: string,
     @Req() req: AdminRequest,
@@ -94,6 +116,11 @@ export class AdminController {
   }
 
   @Patch('users/:id/role')
+  @ApiOperation({ summary: 'Update user role (admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiBody({ type: UpdateRoleDto })
+  @ApiResponse({ status: 200, description: 'User role updated' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async updateRole(
     @Param('id') id: string,
     @Body() body: UpdateRoleDto,
@@ -104,6 +131,10 @@ export class AdminController {
   }
 
   @Patch('users/:id/verify')
+  @ApiOperation({ summary: 'Toggle user verification (admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User verification toggled' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async toggleVerify(
     @Param('id') id: string,
     @Req() req: AdminRequest,
@@ -113,6 +144,9 @@ export class AdminController {
   }
 
   @Get('reports')
+  @ApiOperation({ summary: 'List all reports (admin only)' })
+  @ApiResponse({ status: 200, description: 'Reports retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async findReports(
     @Req() req: AdminRequest,
   ): Promise<
@@ -131,6 +165,10 @@ export class AdminController {
   }
 
   @Patch('reports/:id/resolve')
+  @ApiOperation({ summary: 'Resolve a report (admin only)' })
+  @ApiParam({ name: 'id', description: 'Report ID' })
+  @ApiResponse({ status: 200, description: 'Report resolved' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async resolveReport(
     @Param('id') id: string,
     @Req() req: AdminRequest,
@@ -140,6 +178,10 @@ export class AdminController {
   }
 
   @Patch('reports/:id/dismiss')
+  @ApiOperation({ summary: 'Dismiss a report (admin only)' })
+  @ApiParam({ name: 'id', description: 'Report ID' })
+  @ApiResponse({ status: 200, description: 'Report dismissed' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async dismissReport(
     @Param('id') id: string,
     @Req() req: AdminRequest,
@@ -149,6 +191,9 @@ export class AdminController {
   }
 
   @Get('stats')
+  @ApiOperation({ summary: 'Get platform statistics (admin only)' })
+  @ApiResponse({ status: 200, description: 'Stats retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async getStats(
     @Req() req: AdminRequest,
   ): Promise<{

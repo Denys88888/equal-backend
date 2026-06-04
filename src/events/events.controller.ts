@@ -12,6 +12,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EventsService } from './events.service';
 import { Event, RsvpStatus } from '@prisma/client';
@@ -24,9 +33,9 @@ interface AuthenticatedRequest extends Request {
 }
 
 class CreateEventDto {
-  title: string;
+  title!: string;
   description?: string;
-  date: string;
+  date!: string;
   location?: string;
   city?: string;
   category?: string;
@@ -35,19 +44,26 @@ class CreateEventDto {
 }
 
 class RsvpDto {
-  status: RsvpStatus;
+  status!: RsvpStatus;
 }
 
 interface EventWithRsvpCounts extends Event {
   rsvpCounts: Record<RsvpStatus, number>;
 }
 
+@ApiTags('Events')
+@ApiBearerAuth()
 @Controller('events')
 @UseGuards(JwtAuthGuard)
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List all events' })
+  @ApiQuery({ name: 'city', required: false, description: 'Filter by city' })
+  @ApiQuery({ name: 'category', required: false, description: 'Filter by category' })
+  @ApiQuery({ name: 'upcoming', required: false, description: 'Filter upcoming events' })
+  @ApiResponse({ status: 200, description: 'Events retrieved successfully' })
   async findAll(
     @Query('city') city?: string,
     @Query('category') category?: string,
@@ -59,6 +75,10 @@ export class EventsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get event by ID' })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 200, description: 'Event retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
   async findById(@Param('id') id: string): Promise<EventWithRsvpCounts> {
     const event: EventWithRsvpCounts | null =
       await this.eventsService.findById(id);
@@ -69,6 +89,10 @@ export class EventsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new event (admin only)' })
+  @ApiBody({ type: CreateEventDto })
+  @ApiResponse({ status: 201, description: 'Event created successfully' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async create(
     @Body() dto: CreateEventDto,
     @Req() req: AuthenticatedRequest,
@@ -84,6 +108,10 @@ export class EventsController {
   }
 
   @Post(':id/rsvp')
+  @ApiOperation({ summary: 'RSVP to an event' })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiBody({ type: RsvpDto })
+  @ApiResponse({ status: 201, description: 'RSVP recorded successfully' })
   async rsvp(
     @Param('id') eventId: string,
     @Body() dto: RsvpDto,
@@ -94,6 +122,9 @@ export class EventsController {
   }
 
   @Delete(':id/rsvp')
+  @ApiOperation({ summary: 'Cancel RSVP to an event' })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 200, description: 'RSVP cancelled successfully' })
   async cancelRsvp(
     @Param('id') eventId: string,
     @Req() req: AuthenticatedRequest,

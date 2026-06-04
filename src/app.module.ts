@@ -1,7 +1,12 @@
-import { Module } from '@nestjs/common';
+import {
+  Module,
+  APP_GUARD,
+  NestModule,
+  MiddlewareConsumer,
+} from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -16,10 +21,14 @@ import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { HealthModule } from './health/health.module';
+import { SanitizationMiddleware } from './common/middleware/sanitization.middleware';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRoot([
+      { ttl: 60000, limit: 100 }, // General: 100 req/min
+      { ttl: 1000, limit: 10, name: 'short' }, // Burst: 10 req/sec
+    ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'equal-secret-key',
@@ -40,5 +49,12 @@ import { HealthModule } from './health/health.module';
     GatewayModule,
     HealthModule,
   ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SanitizationMiddleware).forRoutes('*');
+  }
+}
