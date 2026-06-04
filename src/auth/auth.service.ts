@@ -46,18 +46,24 @@ export class AuthService {
     // Verify the access token with Pi Platform API
     let piUser: PiUser;
     try {
+      console.log('[AUTH] Calling Platform API /me with token length:', accessToken.length);
       const response = await fetch('https://api.minepi.com/v2/me', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      console.log('[AUTH] Platform API response status:', response.status);
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log('[AUTH] Platform API error body:', errorText);
         throw new UnauthorizedException('Invalid Pi access token');
       }
       const data = (await response.json()) as {
         uid: string;
         username: string;
       };
+      console.log('[AUTH] Platform API success, uid:', data.uid);
       piUser = { uid: data.uid, username: data.username };
-    } catch {
+    } catch (err: any) {
+      console.error('[AUTH] Platform API or DB error:', err.message || err);
       throw new UnauthorizedException('Failed to verify Pi access token');
     }
 
