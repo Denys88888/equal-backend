@@ -1,24 +1,29 @@
 services:
   - type: web
-    name: equal-api
-    runtime: docker
+    name: equal-backend
+    runtime: node
     plan: starter
-    region: oregon
-    dockerfilePath: ./Dockerfile
+    branch: main
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: equal-postgres
+          name: equal-db
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 10000
+        value: 3000
+      - key: NPM_CONFIG_CACHE
+        value: /tmp/npm-cache
+      - key: PI_API_KEY
+        value: e85da77a0d4407fc313b8db1d36fc02160aded43d381430b2e536ab04e3a75d7725830a07fb6bd2ac99bd12d889d7c0cd6d4b59c90d237645d91cdc432dae5dd
+    healthCheckPath: /v1/health
 
 databases:
-  - name: equal-postgres
+  - name: equal-db
     plan: starter
-    databaseName: equal
-    user: equal
+    postgresMajorVersion: 16
