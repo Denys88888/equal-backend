@@ -1,8 +1,7 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { User, Profile, Role } from '@prisma/client';
-import { compareSync, hashSync } from 'bcryptjs';
+import { User, Role } from '@prisma/client';
 
 export interface AuthToken {
   access_token: string;
@@ -10,8 +9,14 @@ export interface AuthToken {
 
 export interface JwtPayload {
   sub: string;
-  email: string;
+  piUid: string;
   role: Role;
+}
+
+// Pi Platform API user response
+interface PiUser {
+  uid: string;
+  username: string;
 }
 
 @Injectable()
@@ -24,7 +29,7 @@ export class AuthService {
   private signToken(user: User): AuthToken {
     const payload: JwtPayload = {
       sub: user.id,
-      email: user.email ?? '',
+      piUid: user.piUid,
       role: user.role,
     };
     return {
@@ -32,73 +37,49 @@ export class AuthService {
     };
   }
 
-  async register(email: string, password: string): Promise<AuthToken> {
-    const existing: User | null = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existing) {
-      throw new ConflictException('Email already in use');
+  async piLogin(
+    accessToken: string,
+    _scopes: string[],
+  ): Promise<
+    AuthToken & { user: { id: string; username: string; name: string } }
+  > {
+    // Verify the access token with Pi Platform API
+    let piUser: PiUser;
+    try {
+      const response = await fetch('https://api.minepi.com/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        throw new UnauthorizedException('Invalid Pi access token');
+      }
+      const data = (await response.json()) as {
+        uid: string;
+        username: string;
+      };
+      piUser = { uid: data.uid, username: data.username };
+    } catch {
+      throw new UnauthorizedException('Failed to verify Pi access token');
     }
 
-    const hashedPassword: string = hashSync(password, 10);
-    const username: string = email.split('@')[0] + Math.floor(Math.random() * 10000);
-
-    const user: User = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name: email.split('@')[0],
-        username,
-        profile: {
-          create: {},
-        },
-      },
-    });
-
-    return this.signToken(user);
-  }
-
-  async login(email: string, password: string): Promise<AuthToken> {
-    const user: User | null = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user || !user.password) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const valid: boolean = compareSync(password, user.password);
-    if (!valid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    return this.signToken(user);
-  }
-
-  async piLogin(accessToken: string): Promise<AuthToken> {
-    // Mock Pi Network authentication
-    // In production, verify the accessToken with Pi Network's API
-    const mockPiUid: string = 'pi_' + accessToken.slice(0, 16);
-
+    // Find or create user
     let user: User | null = await this.prisma.user.findUnique({
-      where: { piUid: mockPiUid },
+      where: { piUid: piUser.uid },
     });
 
     if (!user) {
-      const username: string = 'pi_user_' + Math.floor(Math.random() * 100000);
       user = await this.prisma.user.create({
         data: {
-          piUid: mockPiUid,
-          name: 'Pi User',
-          username,
-          profile: {
-            create: {},
-          },
+          piUid: piUser.uid,
+          name: piUser.username,
+          username: piUser.username,
+          profile: { create: {} },
         },
       });
     }
 
-    return this.signToken(user);
+    return {
+      ...this.signToken(user),
+      user: { id: user.id, username: user.username, name: user.name },
+    };
   }
 }

@@ -1,31 +1,28 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
+  Get,
   Req,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PaymentsService, PaymentRecord } from './payments.service';
 
 interface AuthenticatedRequest extends Request {
-  user: {
-    userId: string;
-    role: string;
-  };
+  user: { userId: string; role: string };
 }
 
-class DoubleCheckPaymentDto {
-  matchId: string;
-  amount: number;
+class CreatePaymentDto {
+  amount!: number;
+  memo!: string;
+  matchId!: string;
 }
 
-interface PaymentInitResponse {
-  paymentId: string;
-  status: string;
-  deepLink: string;
+class CompletePaymentDto {
+  txid!: string;
 }
 
 @Controller('payments')
@@ -33,31 +30,47 @@ interface PaymentInitResponse {
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Post('double-check')
-  async initiateDoubleCheck(
-    @Body() dto: DoubleCheckPaymentDto,
+  @Post()
+  async createPayment(
+    @Body() dto: CreatePaymentDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<PaymentInitResponse> {
-    return this.paymentsService.initiateDoubleCheck(
+  ): Promise<PaymentRecord> {
+    return this.paymentsService.createPayment(
       req.user.userId,
-      dto.matchId,
       dto.amount,
+      dto.memo,
+      dto.matchId,
     );
   }
 
-  @Post('webhook')
-  async handleWebhook(
-    @Body() payload: Record<string, unknown>,
-  ): Promise<{ success: boolean; status: string }> {
-    return this.paymentsService.handleWebhook(payload);
+  @Post(':paymentId/approve')
+  async approvePayment(@Param('paymentId') paymentId: string) {
+    return this.paymentsService.approvePayment(paymentId);
+  }
+
+  @Post(':paymentId/complete')
+  async completePayment(
+    @Param('paymentId') paymentId: string,
+    @Body() dto: CompletePaymentDto,
+  ) {
+    return this.paymentsService.completePayment(paymentId, dto.txid);
   }
 
   @Get('history')
   async getHistory(
     @Req() req: AuthenticatedRequest,
   ): Promise<{ payments: PaymentRecord[] }> {
-    const payments: PaymentRecord[] =
-      await this.paymentsService.getHistory(req.user.userId);
+    const payments = await this.paymentsService.getHistory(req.user.userId);
+    return { payments };
+  }
+
+  @Get('incomplete')
+  async getIncomplete(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ payments: PaymentRecord[] }> {
+    const payments = this.paymentsService.findIncompletePayments(
+      req.user.userId,
+    );
     return { payments };
   }
 }
