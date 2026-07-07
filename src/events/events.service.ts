@@ -5,6 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EventsService {
   constructor(private prisma: PrismaService) {}
 
+  async getOne(eventId: string) {
+    return this.prisma.event.findUnique({
+      where: { id: eventId },
+      include: { _count: { select: { rsvps: true } } },
+    });
+  }
+
   async getAll() {
     return this.prisma.event.findMany({
       orderBy: { date: 'asc' },

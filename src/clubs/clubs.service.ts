@@ -5,6 +5,17 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ClubsService {
   constructor(private prisma: PrismaService) {}
 
+  async getOne(clubId: string) {
+    return this.prisma.club.findUnique({
+      where: { id: clubId },
+      include: { _count: { select: { members: true, posts: true } } },
+    });
+  }
+
+  async leave(clubId: string, userId: string) {
+    return this.prisma.clubMember.deleteMany({ where: { clubId, userId } });
+  }
+
   async getAll() {
     return this.prisma.club.findMany({
       include: { _count: { select: { members: true, posts: true } } },

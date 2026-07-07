@@ -28,10 +28,10 @@ export class AuthService {
       });
     }
 
-    const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid });
+    const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid, role: user.role });
     return {
       access_token,
-      user: { id: user.id, name: user.name, username: user.username },
+      user: { id: user.id, name: user.name, username: user.username, role: user.role },
     };
   }
 }

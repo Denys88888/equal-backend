@@ -15,6 +15,13 @@ export class ClubsController {
     return this.clubsService.getAll();
   }
 
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getClub(@Param('id') clubId: string) {
+    return this.clubsService.getOne(clubId);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -27,6 +34,13 @@ export class ClubsController {
   @ApiBearerAuth()
   async joinClub(@Request() req: { user: { id: string } }, @Param('id') clubId: string) {
     return this.clubsService.join(clubId, req.user.id);
+  }
+
+  @Post(':id/leave')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async leaveClub(@Request() req: { user: { id: string } }, @Param('id') clubId: string) {
+    return this.clubsService.leave(clubId, req.user.id);
   }
 
   @Get(':id/posts')

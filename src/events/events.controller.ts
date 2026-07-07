@@ -13,6 +13,11 @@ export class EventsController {
     return this.eventsService.getAll();
   }
 
+  @Get(':id')
+  async getEvent(@Param('id') eventId: string) {
+    return this.eventsService.getOne(eventId);
+  }
+
   @Post(':id/rsvp')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

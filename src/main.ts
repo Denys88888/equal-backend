@@ -8,7 +8,18 @@ async function bootstrap() {
   
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.enableCors({ origin: '*', credentials: true });
+  const allowedOrigins = [
+    'https://denys88888.github.io',
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      else callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Equal API')
