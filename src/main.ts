@@ -9,6 +9,7 @@ async function bootstrap() {
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const allowedOrigins = [
+    'https://equal-app.onrender.com',
     'https://denys88888.github.io',
     'http://localhost:3000',
     'http://localhost:5173',
