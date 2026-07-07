@@ -1,40 +1,37 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+
+const PI_API_BASE = 'https://api.minepi.com';
 
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService, private jwt: JwtService) {}
 
-  async register(email: string, password: string) {
-    const hash = await bcrypt.hash(password, 10);
-    const user = await this.prisma.user.create({
-      data: { email, password: hash, name: email.split('@')[0], username: `user_${Date.now()}` },
-    });
-    const token = this.jwt.sign({ sub: user.id, email: user.email });
-    return { token, user: { id: user.id, name: user.name, email: user.email } };
-  }
-
-  async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !user.password) throw new UnauthorizedException('Invalid credentials');
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
-    const token = this.jwt.sign({ sub: user.id, email: user.email });
-    return { token, user: { id: user.id, name: user.name, email: user.email } };
-  }
-
   async piLogin(accessToken: string) {
-    // Mock Pi verification - in production verify with Pi Platform API
-    const piUid = `pi_${accessToken.slice(0, 10)}`;
-    let user = await this.prisma.user.findUnique({ where: { piUid } });
+    const piRes = await fetch(`${PI_API_BASE}/v2/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!piRes.ok) {
+      throw new UnauthorizedException('Invalid Pi access token');
+    }
+    const piUser = await piRes.json() as { uid: string; username: string };
+
+    let user = await this.prisma.user.findUnique({ where: { piUid: piUser.uid } });
     if (!user) {
       user = await this.prisma.user.create({
-        data: { piUid, name: `PiUser_${Date.now()}`, username: `pi_${Date.now()}` },
+        data: {
+          piUid: piUser.uid,
+          name: piUser.username,
+          username: piUser.username,
+        },
       });
     }
-    const token = this.jwt.sign({ sub: user.id, piUid: user.piUid });
-    return { token, user: { id: user.id, name: user.name, piUid: user.piUid } };
+
+    const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid });
+    return {
+      access_token,
+      user: { id: user.id, name: user.name, username: user.username },
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Param } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 
@@ -7,13 +7,13 @@ import { PaymentsService } from './payments.service';
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Post('approve')
-  async approve(@Body() body: { paymentId: string }) {
-    return this.paymentsService.approve(body.paymentId);
+  @Post(':paymentId/approve')
+  async approve(@Param('paymentId') paymentId: string) {
+    return this.paymentsService.approve(paymentId);
   }
 
-  @Post('complete')
-  async complete(@Body() body: { paymentId: string; txid: string }) {
-    return this.paymentsService.complete(body.paymentId, body.txid);
+  @Post(':paymentId/complete')
+  async complete(@Param('paymentId') paymentId: string, @Body() body: { txid: string }) {
+    return this.paymentsService.complete(paymentId, body.txid);
   }
 }

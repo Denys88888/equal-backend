@@ -3,7 +3,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProfilesModule } from './profiles/profiles.module';
-import { DiscoverModule } from './discover/discover.module';
 import { MatchesModule } from './matches/matches.module';
 import { MessagesModule } from './messages/messages.module';
 import { ClubsModule } from './clubs/clubs.module';
@@ -21,7 +20,6 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     UsersModule,
     ProfilesModule,
-    DiscoverModule,
     MatchesModule,
     MessagesModule,
     ClubsModule,
