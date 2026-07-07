@@ -1,9 +1,16 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { IsString, MinLength, IsArray, IsOptional } from 'class-validator';
 import { AuthService } from './auth.service';
 
 class PiLoginDto {
+  @IsString()
+  @MinLength(10)
   accessToken!: string;
+
+  @IsArray()
+  @IsOptional()
+  scopes?: string[];
 }
 
 @ApiTags('Auth')

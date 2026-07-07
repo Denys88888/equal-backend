@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PI_API_BASE = 'https://api.minepi.com/v2';
@@ -8,16 +8,20 @@ export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
   private get apiKey(): string {
-    return process.env.PI_API_KEY || '';
+    const key = process.env.PI_API_KEY;
+    if (!key) throw new InternalServerErrorException('PI_API_KEY is not configured');
+    return key;
   }
 
   async create(userId: string, amount: number, memo: string, matchId?: string) {
+    if (!amount || amount <= 0) throw new BadRequestException('Amount must be positive');
     return this.prisma.payment.create({
       data: { userId, amount, memo, matchId, status: 'PENDING' },
     });
   }
 
   async approve(paymentId: string) {
+    // Validate payment exists in our DB first
     const payment = await this.prisma.payment.findFirst({
       where: { OR: [{ id: paymentId }, { piPaymentId: paymentId }] },
     });
@@ -36,6 +40,8 @@ export class PaymentsService {
         where: { id: payment.id },
         data: { status: 'APPROVED', piPaymentId: paymentId },
       });
+    } else {
+      // Payment not in our DB (e.g. recovery flow) — still allow Pi to proceed
     }
 
     return piData;

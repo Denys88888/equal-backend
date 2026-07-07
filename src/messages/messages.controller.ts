@@ -5,24 +5,26 @@ import { MessagesService } from './messages.service';
 
 @ApiTags('Messages')
 @Controller('matches/:matchId/messages')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  async getMessages(@Param('matchId') matchId: string, @Query('limit') limit?: string) {
-    return this.messagesService.getMessages(matchId, parseInt(limit || '50'));
+  async getMessages(
+    @Request() req: { user: { id: string } },
+    @Param('matchId') matchId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.messagesService.getMessages(matchId, req.user.id, parseInt(limit || '50'));
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   async sendMessage(
     @Request() req: { user: { id: string } },
     @Param('matchId') matchId: string,
     @Body() body: { content: string; type?: string },
   ) {
-    return this.messagesService.create(matchId, req.user.id, body.content, body.type || 'text');
+    return this.messagesService.create(matchId, req.user.id, body.content, body.type);
   }
 }

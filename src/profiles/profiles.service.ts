@@ -23,19 +23,44 @@ export class ProfilesService {
         profile: { gender: { not: null } },
       },
       take: 20,
-      include: { profile: true, photos: true },
+      include: { profile: true, photos: { orderBy: { order: 'asc' }, take: 1 } },
     });
 
     return profiles.map((user: any) => ({
       id: user.id,
       name: user.name,
-      age: user.profile?.birthDate ? Math.floor((Date.now() - new Date(user.profile.birthDate).getTime()) / 31536000000) : 25,
-      distance: Math.floor(Math.random() * 20) + 1,
-      compatibility: Math.floor(Math.random() * 40) + 60,
+      age: user.profile?.birthDate
+        ? Math.floor((Date.now() - new Date(user.profile.birthDate).getTime()) / 31536000000)
+        : null,
+      distance: null,
+      compatibility: 80,
       photo: user.photos[0]?.url || '',
       bio: user.profile?.bio || '',
       interests: user.profile?.interests || [],
       verified: user.verified,
     }));
+  }
+
+  async swipe(userId: string, targetUserId: string, action: string) {
+    await this.prisma.swipeAction.upsert({
+      where: { userId_targetId: { userId, targetId: targetUserId } },
+      update: { action },
+      create: { userId, targetId: targetUserId, action },
+    });
+
+    if (action === 'like' || action === 'spark') {
+      const theyLikedUs = await this.prisma.swipeAction.findFirst({
+        where: { userId: targetUserId, targetId: userId, action: { in: ['like', 'spark'] } },
+      });
+      if (theyLikedUs) {
+        const [u1, u2] = [userId, targetUserId].sort();
+        const existing = await this.prisma.match.findFirst({ where: { user1Id: u1, user2Id: u2 } });
+        if (!existing) {
+          await this.prisma.match.create({ data: { user1Id: u1, user2Id: u2 } });
+          return { success: true, isMatch: true };
+        }
+      }
+    }
+    return { success: true, isMatch: false };
   }
 }
