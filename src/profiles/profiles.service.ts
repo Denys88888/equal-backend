@@ -20,7 +20,6 @@ export class ProfilesService {
     const profiles = await this.prisma.user.findMany({
       where: {
         id: { notIn: excludeIds },
-        profile: { gender: { not: null } },
       },
       take: 20,
       include: { profile: true, photos: { orderBy: { order: 'asc' } } },
