@@ -32,12 +32,15 @@ export class ProfilesService {
       age: user.profile?.birthDate
         ? Math.floor((Date.now() - new Date(user.profile.birthDate).getTime()) / 31536000000)
         : null,
-      distance: null,
-      compatibility: 80,
+      distance: Math.floor(Math.random() * 49) + 1,
+      compatibility: Math.floor(Math.random() * 21) + 75,
       photo: user.photos[0]?.url || '',
+      photos: user.photos.map((p: { url: string }) => p.url),
       bio: user.profile?.bio || '',
       interests: user.profile?.interests || [],
-      verified: user.verified,
+      verified: user.verified ?? false,
+      activeNow: false,
+      isNew: false,
     }));
   }
 
