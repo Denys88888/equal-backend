@@ -6,6 +6,7 @@ services:
     branch: main
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: node dist/main
+    nodeVersion: "20.11.0"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
