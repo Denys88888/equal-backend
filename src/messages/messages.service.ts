@@ -15,13 +15,35 @@ export class MessagesService {
   }
 
   async getMessages(matchId: string, userId: string, limit = 50) {
-    await this.verifyParticipant(matchId, userId);
+    const match = await this.verifyParticipant(matchId, userId);
     const messages = await this.prisma.message.findMany({
       where: { matchId },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
-    return { messages: messages.reverse(), hasMore: messages.length === limit };
+    const partnerId = match.user1Id === userId ? match.user2Id : match.user1Id;
+    const partner = await this.prisma.user.findUnique({
+      where: { id: partnerId },
+      include: { photos: { orderBy: { order: 'asc' }, take: 1 } },
+    });
+    const normalized = messages.reverse().map((m) => ({
+      id: m.id,
+      type: m.type,
+      content: m.content,
+      sender: m.senderId === userId ? 'me' : 'them',
+      timestamp: m.createdAt,
+      read: true,
+    }));
+    return {
+      messages: normalized,
+      hasMore: messages.length === limit,
+      matchName: partner?.name || '',
+      matchAvatar: partner?.photos[0]?.url || '',
+      isOnline: false,
+      isVerified: false,
+      sharedInterests: [],
+      icebreakers: [],
+    };
   }
 
   async create(matchId: string, senderId: string, content: string, type = 'TEXT') {
