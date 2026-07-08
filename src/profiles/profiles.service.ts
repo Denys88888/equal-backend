@@ -58,9 +58,10 @@ export class ProfilesService {
         const [u1, u2] = [userId, targetUserId].sort();
         const existing = await this.prisma.match.findFirst({ where: { user1Id: u1, user2Id: u2 } });
         if (!existing) {
-          await this.prisma.match.create({ data: { user1Id: u1, user2Id: u2 } });
-          return { success: true, isMatch: true };
+          const match = await this.prisma.match.create({ data: { user1Id: u1, user2Id: u2 } });
+          return { success: true, isMatch: true, matchId: match.id };
         }
+        return { success: true, isMatch: true, matchId: existing.id };
       }
     }
     return { success: true, isMatch: false };
