@@ -21,6 +21,7 @@ export class MatchesService {
       const age = birthDate
         ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31536000000)
         : null;
+      const ageMs = Date.now() - new Date(match.createdAt).getTime();
       return {
         id: match.id,
         name: partner.name,
@@ -28,6 +29,14 @@ export class MatchesService {
         age,
         compatibility: 80,
         createdAt: match.createdAt,
+        isNew: ageMs < 24 * 60 * 60 * 1000,
+        hasConversation: false,
+        isOnline: false,
+        sparkUsed: false,
+        unreadCount: 0,
+        lastMessage: undefined,
+        lastMessageTime: undefined,
+        isTyping: false,
       };
     });
   }
