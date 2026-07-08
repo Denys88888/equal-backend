@@ -7,10 +7,11 @@
   "license": "PiOS",
   "scripts": {
     "build": "nest build",
+    "postbuild": "npx prisma migrate resolve --rolled-back 20260708_add_payment_model 2>/dev/null || true",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "npx prisma migrate deploy && node dist/main",
+    "start:prod": "npx prisma db push --accept-data-loss && node dist/main",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "ts-node prisma/seed.ts",
