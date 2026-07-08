@@ -25,7 +25,6 @@ model User {
 
   profile   Profile?
   photos    Photo[]
-  messages  Message[]
   clubMembers ClubMember[]
   eventRsvps EventRsvp[]
   reports   Report[]

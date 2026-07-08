@@ -18,21 +18,25 @@ export class UsersService {
   }
 
   async update(id: string, data: Record<string, unknown>) {
-    const { profile, ...rawUserData } = data;
+    const { profile: nestedProfile, ...rawData } = data;
 
-    // Only allow whitelisted fields to prevent role/trustScore manipulation
+    // Only allow whitelisted user fields
     const userData: Record<string, unknown> = {};
     for (const key of ALLOWED_USER_FIELDS) {
-      if (key in rawUserData) userData[key] = rawUserData[key];
+      if (key in rawData) userData[key] = rawData[key];
     }
 
-    if (profile && typeof profile === 'object') {
-      const profileData: Record<string, unknown> = {};
-      for (const key of ALLOWED_PROFILE_FIELDS) {
-        if (key in (profile as Record<string, unknown>)) {
-          profileData[key] = (profile as Record<string, unknown>)[key];
-        }
+    // Accept profile fields nested under "profile" OR at top level
+    const profileData: Record<string, unknown> = {};
+    for (const key of ALLOWED_PROFILE_FIELDS) {
+      if (nestedProfile && typeof nestedProfile === 'object' && key in (nestedProfile as Record<string, unknown>)) {
+        profileData[key] = (nestedProfile as Record<string, unknown>)[key];
+      } else if (key in rawData) {
+        profileData[key] = rawData[key];
       }
+    }
+
+    if (Object.keys(profileData).length > 0) {
       await this.prisma.profile.upsert({
         where: { userId: id },
         update: profileData,
@@ -40,7 +44,9 @@ export class UsersService {
       });
     }
 
-    if (Object.keys(userData).length === 0 && !profile) return this.findById(id);
+    if (Object.keys(userData).length === 0 && Object.keys(profileData).length === 0) {
+      return this.findById(id);
+    }
     if (Object.keys(userData).length > 0) {
       await this.prisma.user.update({ where: { id }, data: userData });
     }

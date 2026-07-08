@@ -1,7 +1,8 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { IsString, MinLength, IsArray, IsOptional } from 'class-validator';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 class PiLoginDto {
   @IsString()
@@ -22,5 +23,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with Pi Network' })
   async piLogin(@Body() dto: PiLoginDto) {
     return this.authService.piLogin(dto.accessToken);
+  }
+
+  @Post('refresh')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Refresh JWT token' })
+  async refresh(@Request() req: { user: { id: string } }) {
+    return this.authService.refresh(req.user.id);
   }
 }

@@ -8,6 +8,13 @@ const PI_API_BASE = 'https://api.minepi.com';
 export class AuthService {
   constructor(private prisma: PrismaService, private jwt: JwtService) {}
 
+  async refresh(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+    const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid, role: user.role });
+    return { access_token };
+  }
+
   async piLogin(accessToken: string) {
     const piRes = await fetch(`${PI_API_BASE}/v2/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
