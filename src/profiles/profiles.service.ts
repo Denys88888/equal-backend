@@ -23,7 +23,7 @@ export class ProfilesService {
         profile: { gender: { not: null } },
       },
       take: 20,
-      include: { profile: true, photos: { orderBy: { order: 'asc' }, take: 1 } },
+      include: { profile: true, photos: { orderBy: { order: 'asc' } } },
     });
 
     return profiles.map((user: any) => ({
