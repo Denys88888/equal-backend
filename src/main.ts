@@ -31,6 +31,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Health check endpoint (no prefix, no auth) for Render keep-alive pings
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (_req: unknown, res: { json: (v: unknown) => void }) => {
+    res.json({ status: 'ok', ts: Date.now() });
+  });
+
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`API running on port ${port}`);
