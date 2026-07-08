@@ -100,6 +100,7 @@ model Club {
   description String?
   category    String
   icon        String?
+  memberCount Int @default(0)
   createdAt   DateTime @default(now())
 
   members     ClubMember[]
@@ -130,18 +131,19 @@ model ClubPost {
 }
 
 model Event {
-  id          String @id @default(cuid())
-  title       String
-  description String?
-  date        DateTime
-  location    String?
-  city        String?
-  category    String?
-  price       Float @default(0)
+  id           String @id @default(cuid())
+  title        String
+  description  String?
+  date         DateTime
+  location     String?
+  city         String?
+  category     String?
+  price        Float @default(0)
   maxAttendees Int?
-  createdAt   DateTime @default(now())
+  attendeeCount Int @default(0)
+  createdAt    DateTime @default(now())
 
-  rsvps       EventRsvp[]
+  rsvps        EventRsvp[]
 }
 
 model EventRsvp {
