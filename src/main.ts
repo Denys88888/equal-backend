@@ -40,5 +40,11 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`API running on port ${port}`);
+
+  // Keep Render free tier warm (spins down after 15 min of inactivity)
+  const selfUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
+  setInterval(() => {
+    fetch(`${selfUrl}/v1/health`).catch(() => {});
+  }, 14 * 60 * 1000);
 }
 bootstrap();
