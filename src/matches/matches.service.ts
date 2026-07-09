@@ -11,6 +11,7 @@ export class MatchesService {
       include: {
         user1: { include: { profile: true, photos: { orderBy: { order: 'asc' }, take: 1 } } },
         user2: { include: { profile: true, photos: { orderBy: { order: 'asc' }, take: 1 } } },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -22,6 +23,7 @@ export class MatchesService {
         ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31536000000)
         : null;
       const ageMs = Date.now() - new Date(match.createdAt).getTime();
+      const lastMsg = match.messages[0];
       return {
         id: match.id,
         name: partner.name,
@@ -30,12 +32,12 @@ export class MatchesService {
         compatibility: 80,
         createdAt: match.createdAt,
         isNew: ageMs < 24 * 60 * 60 * 1000,
-        hasConversation: false,
+        hasConversation: match.messages.length > 0,
         isOnline: false,
         sparkUsed: false,
         unreadCount: 0,
-        lastMessage: undefined,
-        lastMessageTime: undefined,
+        lastMessage: lastMsg?.content,
+        lastMessageTime: lastMsg?.createdAt,
         isTyping: false,
       };
     });
