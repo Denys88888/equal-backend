@@ -69,6 +69,11 @@ export class UsersService {
     return this.prisma.photo.delete({ where: { id: photoId } });
   }
 
+  async deleteUser(id: string) {
+    await this.prisma.user.delete({ where: { id } });
+    return { success: true };
+  }
+
   async reorderPhotos(userId: string, photoIds: string[]) {
     await Promise.all(
       photoIds.map((id, order) =>

@@ -45,4 +45,9 @@ export class UsersController {
   ) {
     return this.usersService.reorderPhotos(req.user.id, body.photoIds);
   }
+
+  @Delete('me')
+  async deleteMe(@Request() req: { user: { id: string } }) {
+    return this.usersService.deleteUser(req.user.id);
+  }
 }
