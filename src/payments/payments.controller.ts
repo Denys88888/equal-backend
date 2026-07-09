@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PaymentsService } from './payments.service';
@@ -7,6 +7,20 @@ import { PaymentsService } from './payments.service';
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
+
+  @Get('history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getHistory(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.getHistory(req.user.id);
+  }
+
+  @Get('incomplete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getIncomplete(@Request() req: { user: { id: string } }) {
+    return this.paymentsService.getIncomplete(req.user.id);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard)

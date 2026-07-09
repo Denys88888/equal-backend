@@ -13,6 +13,21 @@ export class PaymentsService {
     return key;
   }
 
+  async getHistory(userId: string) {
+    return this.prisma.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  async getIncomplete(userId: string) {
+    return this.prisma.payment.findMany({
+      where: { userId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async create(userId: string, amount: number, memo: string, matchId?: string) {
     if (!amount || amount <= 0) throw new BadRequestException('Amount must be positive');
     return this.prisma.payment.create({
