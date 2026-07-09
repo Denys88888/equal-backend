@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProfilesService } from './profiles.service';
@@ -18,6 +18,22 @@ export class ProfilesController {
   @Get('me')
   async getMyProfile(@Request() req: { user: { id: string } }) {
     return this.profilesService.getProfile(req.user.id);
+  }
+
+  @Put('me')
+  async updateMyProfile(
+    @Request() req: { user: { id: string } },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.profilesService.updateProfile(req.user.id, body);
+  }
+
+  @Patch('me')
+  async patchMyProfile(
+    @Request() req: { user: { id: string } },
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.profilesService.updateProfile(req.user.id, body);
   }
 
   @Post('swipe')

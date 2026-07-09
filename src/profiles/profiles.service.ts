@@ -43,6 +43,19 @@ export class ProfilesService {
     }));
   }
 
+  async updateProfile(userId: string, data: Record<string, unknown>) {
+    const ALLOWED = ['bio', 'birthDate', 'city', 'latitude', 'longitude', 'gender', 'lookingFor', 'goals', 'interests'];
+    const profileData: Record<string, unknown> = {};
+    for (const key of ALLOWED) {
+      if (key in data) profileData[key] = data[key];
+    }
+    return this.prisma.profile.upsert({
+      where: { userId },
+      update: profileData,
+      create: { userId, ...profileData },
+    });
+  }
+
   async swipe(userId: string, targetUserId: string, action: string) {
     await this.prisma.swipeAction.upsert({
       where: { userId_targetId: { userId, targetId: targetUserId } },
