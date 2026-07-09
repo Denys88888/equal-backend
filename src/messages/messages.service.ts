@@ -37,6 +37,7 @@ export class MessagesService {
     return {
       messages: normalized,
       hasMore: messages.length === limit,
+      partnerId: partnerId,
       matchName: partner?.name || '',
       matchAvatar: partner?.photos[0]?.url || '',
       isOnline: false,

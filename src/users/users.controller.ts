@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Delete, Body, Query, UseGuards, Request, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -49,5 +49,22 @@ export class UsersController {
   @Delete('me')
   async deleteMe(@Request() req: { user: { id: string } }) {
     return this.usersService.deleteUser(req.user.id);
+  }
+
+  @Post(':id/block')
+  async blockUser(
+    @Request() req: { user: { id: string } },
+    @Param('id') targetId: string,
+  ) {
+    return this.usersService.blockUser(req.user.id, targetId);
+  }
+
+  @Post(':id/report')
+  async reportUser(
+    @Request() req: { user: { id: string } },
+    @Param('id') targetId: string,
+    @Body() body: { reason: string; description?: string },
+  ) {
+    return this.usersService.reportUser(req.user.id, targetId, body.reason, body.description);
   }
 }

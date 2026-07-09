@@ -74,6 +74,22 @@ export class UsersService {
     return { success: true };
   }
 
+  async blockUser(userId: string, targetId: string) {
+    await this.prisma.swipeAction.upsert({
+      where: { userId_targetId: { userId, targetId } },
+      update: { action: 'block' },
+      create: { userId, targetId, action: 'block' },
+    });
+    return { success: true };
+  }
+
+  async reportUser(userId: string, targetId: string, reason: string, description?: string) {
+    await this.prisma.report.create({
+      data: { reporterId: userId, targetId, reason, description },
+    });
+    return { success: true };
+  }
+
   async reorderPhotos(userId: string, photoIds: string[]) {
     await Promise.all(
       photoIds.map((id, order) =>
