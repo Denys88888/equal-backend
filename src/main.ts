@@ -1,11 +1,16 @@
-import { NestFactory } from '@nestjs/core';
+import { initSentry } from './sentry';
+initSentry();
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { SentryExceptionFilter } from './sentry.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+  const adapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new SentryExceptionFilter(adapterHost.httpAdapter));
+
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const allowedOrigins = [
