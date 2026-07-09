@@ -21,4 +21,11 @@ export class SparksController {
   async earn(@Request() req: { user: { id: string } }, @Body() body: { action: string }) {
     return this.sparksService.earn(req.user.id, body.action);
   }
+
+  @Post('spend')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async spend(@Request() req: { user: { id: string } }, @Body() body: { amount: number }) {
+    return this.sparksService.spend(req.user.id, body.amount ?? 1);
+  }
 }

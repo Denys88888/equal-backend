@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const EARN_REWARDS: Record<string, number> = {
@@ -25,5 +25,15 @@ export class SparksService {
       data: { sparkBalance: { increment: earned } },
     });
     return { earned, newBalance: user.sparkBalance };
+  }
+
+  async spend(userId: string, amount: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { sparkBalance: true } });
+    if (!user || user.sparkBalance < amount) throw new BadRequestException('Not enough sparks');
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { sparkBalance: { decrement: amount } },
+    });
+    return { spent: amount, newBalance: updated.sparkBalance };
   }
 }
