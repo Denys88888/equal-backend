@@ -1,15 +1,20 @@
 import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { UploadService } from '../upload/upload.service';
 
 @ApiTags('Users')
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   @Get('me')
   async getMe(@Request() req: { user: { id: string } }) {
@@ -22,14 +27,13 @@ export class UsersController {
   }
 
   @Post('me/photos')
-  @UseInterceptors(FileInterceptor('photo'))
+  @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage() }))
   async uploadPhoto(
     @Request() req: { user: { id: string } },
     @UploadedFile() file: Express.Multer.File,
     @Body('isMain') isMain: string,
   ) {
-    // Store file path (in production use S3/Cloudinary URL)
-    const url = file ? `/uploads/${file.filename || file.originalname}` : '';
+    const url = file ? await this.uploadService.uploadPhoto(file, req.user.id) : '';
     return this.usersService.addPhoto(req.user.id, url, isMain === 'true');
   }
 
