@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PI_API_BASE = 'https://api.minepi.com/v2';
@@ -35,11 +41,15 @@ export class PaymentsService {
     });
   }
 
-  async approve(paymentId: string) {
-    // Validate payment exists in our DB first
+  async approve(requesterId: string, paymentId: string) {
     const payment = await this.prisma.payment.findFirst({
       where: { OR: [{ id: paymentId }, { piPaymentId: paymentId }] },
     });
+
+    // Ownership: if we know who this payment belongs to, reject cross-user calls
+    if (payment && payment.userId !== requesterId) {
+      throw new ForbiddenException('Not your payment');
+    }
 
     const piRes = await fetch(`${PI_API_BASE}/payments/${paymentId}/approve`, {
       method: 'POST',
@@ -55,14 +65,24 @@ export class PaymentsService {
         where: { id: payment.id },
         data: { status: 'APPROVED', piPaymentId: paymentId },
       });
-    } else {
-      // Payment not in our DB (e.g. recovery flow) — still allow Pi to proceed
     }
 
     return piData;
   }
 
-  async complete(paymentId: string, txid: string) {
+  async complete(requesterId: string, paymentId: string, txid: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { piPaymentId: paymentId },
+    });
+
+    if (payment) {
+      if (payment.userId !== requesterId) throw new ForbiddenException('Not your payment');
+      // Idempotency: already completed → return early without re-crediting
+      if (payment.status === 'COMPLETED') {
+        return { success: true, status: 'already_completed', txid: payment.txid ?? txid };
+      }
+    }
+
     const piRes = await fetch(`${PI_API_BASE}/payments/${paymentId}/complete`, {
       method: 'POST',
       headers: { Authorization: `Key ${this.apiKey}`, 'Content-Type': 'application/json' },

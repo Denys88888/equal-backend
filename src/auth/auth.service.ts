@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -11,6 +11,7 @@ export class AuthService {
   async refresh(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User not found');
+    if (!user.isActive) throw new ForbiddenException('Account is deactivated');
     const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid, role: user.role });
     return { access_token };
   }
@@ -33,6 +34,8 @@ export class AuthService {
           username: piUser.username,
         },
       });
+    } else if (!user.isActive) {
+      throw new ForbiddenException('Account is deactivated');
     }
 
     const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid, role: user.role });

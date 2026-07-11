@@ -11,6 +11,10 @@ async function bootstrap() {
   const adapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new SentryExceptionFilter(adapterHost.httpAdapter));
 
+  // Trust one hop so express-rate-limit gets the real client IP from X-Forwarded-For
+  // (Render sits behind a single reverse-proxy hop; using `true` would allow XFF spoofing)
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const allowedOrigins = [

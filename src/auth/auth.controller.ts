@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { IsString, MinLength, IsArray, IsOptional } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -16,6 +17,7 @@ class PiLoginDto {
 
 @ApiTags('Auth')
 @Controller('auth')
+@Throttle({ default: { ttl: 60000, limit: 10 } })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

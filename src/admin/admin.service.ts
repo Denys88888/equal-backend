@@ -34,4 +34,8 @@ export class AdminService {
   async updateReport(id: string, status: string) {
     return this.prisma.report.update({ where: { id }, data: { status: status as any } });
   }
+
+  async setUserActive(id: string, isActive: boolean) {
+    return this.prisma.user.update({ where: { id }, data: { isActive } });
+  }
 }

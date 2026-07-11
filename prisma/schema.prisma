@@ -33,6 +33,18 @@ model User {
   matches1  Match[] @relation("MatchUser1")
   matches2  Match[] @relation("MatchUser2")
   payments  Payment[]
+  sparkEarnLogs SparkEarnLog[]
+}
+
+model SparkEarnLog {
+  id       String   @id @default(cuid())
+  userId   String
+  action   String
+  earnedAt DateTime @default(now())
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, action])
 }
 
 model Profile {
