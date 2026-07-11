@@ -5,15 +5,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './sentry.filter';
+import { join } from 'path';
+import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const adapterHost = app.get(HttpAdapterHost);
   app.useGlobalFilters(new SentryExceptionFilter(adapterHost.httpAdapter));
 
+  const expressApp = app.getHttpAdapter().getInstance() as express.Application;
   // Trust one hop so express-rate-limit gets the real client IP from X-Forwarded-For
   // (Render sits behind a single reverse-proxy hop; using `true` would allow XFF spoofing)
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  expressApp.set('trust proxy', 1);
+  // Serve locally-saved photo uploads (fallback when Cloudinary is not configured)
+  expressApp.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

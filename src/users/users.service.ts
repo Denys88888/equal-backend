@@ -54,10 +54,11 @@ export class UsersService {
   }
 
   async addPhoto(userId: string, url: string, isMain: boolean) {
+    const count = await this.prisma.photo.count({ where: { userId } });
+    if (count >= 9) throw new ForbiddenException('Photo limit reached (max 9)');
     if (isMain) {
       await this.prisma.photo.updateMany({ where: { userId }, data: { isMain: false } });
     }
-    const count = await this.prisma.photo.count({ where: { userId } });
     return this.prisma.photo.create({
       data: { userId, url, isMain, order: count },
     });

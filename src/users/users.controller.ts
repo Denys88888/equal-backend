@@ -27,7 +27,13 @@ export class UsersController {
   }
 
   @Post('me/photos')
-  @UseInterceptors(FileInterceptor('photo', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('photo', {
+    storage: memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB max
+    fileFilter: (_req, file, cb) => {
+      cb(null, /^image\/(jpeg|png|webp|gif)$/.test(file.mimetype));
+    },
+  }))
   async uploadPhoto(
     @Request() req: { user: { id: string } },
     @UploadedFile() file: Express.Multer.File,
