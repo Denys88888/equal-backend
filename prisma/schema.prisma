@@ -34,6 +34,7 @@ model User {
   matches2  Match[] @relation("MatchUser2")
   payments  Payment[]
   sparkEarnLogs SparkEarnLog[]
+  clubPosts ClubPost[]
 }
 
 model SparkEarnLog {
@@ -140,6 +141,7 @@ model ClubPost {
   createdAt DateTime @default(now())
 
   club     Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 }
 
 model Event {

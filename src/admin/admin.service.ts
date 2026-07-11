@@ -32,7 +32,13 @@ export class AdminService {
   }
 
   async updateReport(id: string, status: string) {
-    return this.prisma.report.update({ where: { id }, data: { status: status as any } });
+    const VALID: string[] = ['PENDING', 'RESOLVED', 'DISMISSED'];
+    const normalized = status.toUpperCase();
+    if (!VALID.includes(normalized)) throw new Error(`Invalid report status: ${status}`);
+    return this.prisma.report.update({
+      where: { id },
+      data: { status: normalized as 'PENDING' | 'RESOLVED' | 'DISMISSED' },
+    });
   }
 
   async setUserActive(id: string, isActive: boolean) {
