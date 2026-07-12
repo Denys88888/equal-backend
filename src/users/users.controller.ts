@@ -5,6 +5,7 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UploadService } from '../upload/upload.service';
+import { PushService } from './push.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -14,6 +15,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly uploadService: UploadService,
+    private readonly pushService: PushService,
   ) {}
 
   @Get('me')
@@ -24,6 +26,17 @@ export class UsersController {
   @Patch('me')
   async updateMe(@Request() req: { user: { id: string } }, @Body() body: Record<string, unknown>) {
     return this.usersService.update(req.user.id, body);
+  }
+
+  @Post('me/push-subscription')
+  async savePushSubscription(@Request() req: { user: { id: string } }, @Body() body: object) {
+    await this.pushService.saveSubscription(req.user.id, body);
+    return { ok: true };
+  }
+
+  @Get('vapid-public-key')
+  getVapidPublicKey() {
+    return { key: process.env.VAPID_PUBLIC_KEY || '' };
   }
 
   @Post('me/photos')

@@ -19,6 +19,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client disconnected: ${client.id}`);
   }
 
+  // ── User & Match rooms ────────────────────────────────
+
   @SubscribeMessage('join:user')
   handleJoinUser(client: Socket, userId: string) {
     client.join(`user:${userId}`);
@@ -30,6 +32,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.join(`match:${matchId}`);
     return { event: 'joined', matchId };
   }
+
+  // ── Chat ──────────────────────────────────────────────
 
   @SubscribeMessage('message:send')
   handleMessage(client: Socket, payload: { matchId: string; content: string; senderId: string }) {
@@ -50,5 +54,27 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('typing:stop')
   handleTypingStop(client: Socket, payload: { matchId: string; userId: string }) {
     client.to(`match:${payload.matchId}`).emit('typing:stop', { userId: payload.userId });
+  }
+
+  // ── WebRTC signaling ──────────────────────────────────
+
+  @SubscribeMessage('call:offer')
+  handleCallOffer(client: Socket, payload: { matchId: string; offer: RTCSessionDescriptionInit; callerId: string }) {
+    client.to(`match:${payload.matchId}`).emit('call:offer', payload);
+  }
+
+  @SubscribeMessage('call:answer')
+  handleCallAnswer(client: Socket, payload: { matchId: string; answer: RTCSessionDescriptionInit }) {
+    client.to(`match:${payload.matchId}`).emit('call:answer', payload);
+  }
+
+  @SubscribeMessage('call:ice')
+  handleCallIce(client: Socket, payload: { matchId: string; candidate: RTCIceCandidateInit }) {
+    client.to(`match:${payload.matchId}`).emit('call:ice', payload);
+  }
+
+  @SubscribeMessage('call:end')
+  handleCallEnd(client: Socket, payload: { matchId: string }) {
+    client.to(`match:${payload.matchId}`).emit('call:end', {});
   }
 }

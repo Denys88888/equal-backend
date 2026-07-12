@@ -1,16 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
+import { PushService } from '../users/push.service';
 
 @Injectable()
 export class ProfilesService {
-  constructor(private prisma: PrismaService, private gateway: ChatGateway) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: ChatGateway,
+    private push: PushService,
+  ) {}
 
   async getProfile(userId: string) {
     return this.prisma.profile.findUnique({ where: { userId } });
   }
 
-  async discover(userId: string, filters: Record<string, string>) {
+  async discover(userId: string, _filters: Record<string, string>) {
     const excludeIds = [userId];
     const alreadySwiped = await this.prisma.swipeAction.findMany({
       where: { userId },
@@ -71,9 +76,20 @@ export class ProfilesService {
         const existing = await this.prisma.match.findFirst({ where: { user1Id: u1, user2Id: u2 } });
         if (!existing) {
           const match = await this.prisma.match.create({ data: { user1Id: u1, user2Id: u2 } });
-          // Notify both users in real-time
+
+          // Real-time socket notification
           this.gateway.server?.to(`user:${targetUserId}`).emit('match:new', { matchId: match.id, withUserId: userId });
           this.gateway.server?.to(`user:${userId}`).emit('match:new', { matchId: match.id, withUserId: targetUserId });
+
+          // Push notification (fire-and-forget)
+          const swiper = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+          this.push.sendToUser(targetUserId, {
+            title: "It's a Match! 💜",
+            body: `You and ${swiper?.name || 'Someone'} liked each other!`,
+            url: `/#/matches`,
+            tag: `match-${match.id}`,
+          }).catch(() => {});
+
           return { success: true, isMatch: true, matchId: match.id };
         }
         return { success: true, isMatch: true, matchId: existing.id };

@@ -1,9 +1,10 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../users/push.service';
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private push: PushService) {}
 
   private async verifyParticipant(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({ where: { id: matchId } });
@@ -37,7 +38,7 @@ export class MessagesService {
     return {
       messages: normalized,
       hasMore: messages.length === limit,
-      partnerId: partnerId,
+      partnerId,
       matchName: partner?.name || '',
       matchAvatar: partner?.photos[0]?.url || '',
       isOnline: false,
@@ -48,11 +49,22 @@ export class MessagesService {
   }
 
   async create(matchId: string, senderId: string, content: string, type = 'TEXT') {
-    await this.verifyParticipant(matchId, senderId);
-    // Normalize to uppercase enum value
+    const match = await this.verifyParticipant(matchId, senderId);
     const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'GIFT' | 'SYSTEM';
-    return this.prisma.message.create({
+    const message = await this.prisma.message.create({
       data: { matchId, senderId, content, type: msgType },
     });
+
+    // Push notification to the other participant
+    const recipientId = match.user1Id === senderId ? match.user2Id : match.user1Id;
+    const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
+    this.push.sendToUser(recipientId, {
+      title: `New message from ${sender?.name || 'Someone'}`,
+      body: content.length > 80 ? content.slice(0, 80) + '…' : content,
+      url: `/#/chat/${matchId}`,
+      tag: `msg-${matchId}`,
+    }).catch(() => {});
+
+    return message;
   }
 }
