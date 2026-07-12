@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChatGateway } from '../gateway/chat.gateway';
 
 @Injectable()
 export class ProfilesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private gateway: ChatGateway) {}
 
   async getProfile(userId: string) {
     return this.prisma.profile.findUnique({ where: { userId } });
@@ -18,9 +19,7 @@ export class ProfilesService {
     excludeIds.push(...alreadySwiped.map((s: { targetId: string }) => s.targetId));
 
     const profiles = await this.prisma.user.findMany({
-      where: {
-        id: { notIn: excludeIds },
-      },
+      where: { id: { notIn: excludeIds } },
       take: 20,
       include: { profile: true, photos: { orderBy: { order: 'asc' } } },
     });
@@ -72,6 +71,9 @@ export class ProfilesService {
         const existing = await this.prisma.match.findFirst({ where: { user1Id: u1, user2Id: u2 } });
         if (!existing) {
           const match = await this.prisma.match.create({ data: { user1Id: u1, user2Id: u2 } });
+          // Notify both users in real-time
+          this.gateway.server?.to(`user:${targetUserId}`).emit('match:new', { matchId: match.id, withUserId: userId });
+          this.gateway.server?.to(`user:${userId}`).emit('match:new', { matchId: match.id, withUserId: targetUserId });
           return { success: true, isMatch: true, matchId: match.id };
         }
         return { success: true, isMatch: true, matchId: existing.id };
