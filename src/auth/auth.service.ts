@@ -16,9 +16,14 @@ export class AuthService {
   }
 
   async piLogin(accessToken: string) {
-    const piRes = await fetch(`${PI_API_BASE}/v2/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    let piRes: Response;
+    try {
+      piRes = await fetch(`${PI_API_BASE}/v2/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch {
+      throw new UnauthorizedException('Pi API unreachable');
+    }
     if (!piRes.ok) {
       throw new UnauthorizedException('Invalid Pi access token');
     }
@@ -26,11 +31,16 @@ export class AuthService {
 
     let user = await this.prisma.user.findUnique({ where: { piUid: piUser.uid } });
     if (!user) {
+      // username is unique; the same person may already exist from another
+      // network (testnet/mainnet piUids differ) — pick a free variant
+      let username = piUser.username;
+      const taken = await this.prisma.user.findUnique({ where: { username } });
+      if (taken) username = `${piUser.username}_${piUser.uid.slice(0, 6)}`;
       user = await this.prisma.user.create({
         data: {
           piUid: piUser.uid,
           name: piUser.username,
-          username: piUser.username,
+          username,
         },
       });
     }
