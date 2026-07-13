@@ -36,6 +36,13 @@ export class UsersService {
       }
     }
 
+    // Prisma DateTime rejects bare "YYYY-MM-DD" strings from <input type="date">
+    if (typeof profileData.birthDate === 'string') {
+      const d = new Date(profileData.birthDate);
+      if (isNaN(d.getTime())) delete profileData.birthDate;
+      else profileData.birthDate = d;
+    }
+
     if (Object.keys(profileData).length > 0) {
       await this.prisma.profile.upsert({
         where: { userId: id },
