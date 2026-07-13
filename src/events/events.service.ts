@@ -20,10 +20,11 @@ export class EventsService {
   }
 
   async rsvp(eventId: string, userId: string, status: string) {
+    const normalizedStatus = status.toUpperCase() as any;
     return this.prisma.eventRsvp.upsert({
       where: { eventId_userId: { eventId, userId } },
-      update: { status: status as any },
-      create: { eventId, userId, status: status as any },
+      update: { status: normalizedStatus },
+      create: { eventId, userId, status: normalizedStatus },
     });
   }
 }
