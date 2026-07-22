@@ -2,130 +2,116 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const PROFILES = [
-  {
-    name: 'Sophie', username: 'sophie_eq', city: 'Paris',
-    bio: 'Art lover, weekend explorer. Looking for someone to share adventures with.',
-    interests: ['Art', 'Coffee', 'Travel', 'Cinema'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1494790108755-2616b612b977?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1997-03-15', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Marcus', username: 'marcus_eq', city: 'Berlin',
-    bio: 'Software engineer by day, musician by night. Coffee enthusiast.',
-    interests: ['Music', 'Coding', 'Coffee', 'Hiking'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1994-07-22', gender: 'male', lookingFor: 'female',
-  },
-  {
-    name: 'Yuki', username: 'yuki_eq', city: 'Tokyo',
-    bio: 'Photographer and foodie. Always chasing the perfect shot and perfect ramen.',
-    interests: ['Photography', 'Food', 'Travel', 'Anime'], goals: ['Dating'],
-    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1999-11-08', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Dmitri', username: 'dmitri_eq', city: 'Moscow',
-    bio: 'Chess player and book collector. Looking for deep conversations and laughter.',
-    interests: ['Chess', 'Books', 'Philosophy', 'Cooking'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1993-05-30', gender: 'male', lookingFor: 'female',
-  },
-  {
-    name: 'Amara', username: 'amara_eq', city: 'Lagos',
-    bio: 'Entrepreneur and dancer. Life is too short for boring conversations!',
-    interests: ['Dancing', 'Business', 'Travel', 'Fashion'], goals: ['Dating'],
-    photo: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1998-09-12', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Carlos', username: 'carlos_eq', city: 'Madrid',
-    bio: 'Chef and salsa dancer. I cook, therefore I am.',
-    interests: ['Cooking', 'Dancing', 'Football', 'Music'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1992-01-19', gender: 'male', lookingFor: 'female',
-  },
-  {
-    name: 'Priya', username: 'priya_eq', city: 'Mumbai',
-    bio: 'Doctor with a passion for yoga and classical music. Seeker of balance.',
-    interests: ['Yoga', 'Music', 'Medicine', 'Books'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1996-04-25', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Leo', username: 'leo_eq', city: 'São Paulo',
-    bio: 'Graphic designer, surfer, and vinyl record collector. Good vibes only.',
-    interests: ['Design', 'Surfing', 'Music', 'Art'], goals: ['Dating'],
-    photo: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1995-08-03', gender: 'male', lookingFor: 'female',
-  },
-  {
-    name: 'Elena', username: 'elena_eq', city: 'Kyiv',
-    bio: 'Literature teacher and amateur poet. Hiking trails and bookshop corners.',
-    interests: ['Literature', 'Hiking', 'Poetry', 'Coffee'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1997-12-01', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Kwame', username: 'kwame_eq', city: 'Accra',
-    bio: 'Architect with a love for jazz, street food, and late-night city walks.',
-    interests: ['Architecture', 'Jazz', 'Travel', 'Food'], goals: ['Dating'],
-    photo: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1991-06-17', gender: 'male', lookingFor: 'female',
-  },
-  {
-    name: 'Mia', username: 'mia_eq', city: 'Amsterdam',
-    bio: 'Freelance journalist, cycling everywhere, plant parent of 30+ plants.',
-    interests: ['Writing', 'Cycling', 'Plants', 'Coffee'], goals: ['Serious relationship'],
-    photo: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1998-02-14', gender: 'female', lookingFor: 'male',
-  },
-  {
-    name: 'Arjun', username: 'arjun_eq', city: 'Bangalore',
-    bio: 'Startup founder, weekend trekker, terrible at cooking but great at ordering.',
-    interests: ['Startups', 'Trekking', 'Technology', 'Cricket'], goals: ['Dating'],
-    photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=600&fit=crop&crop=face',
-    birthDate: '1993-10-09', gender: 'male', lookingFor: 'female',
-  },
+/**
+ * Pilot profiles for the Warsaw launch market.
+ * These are explicitly disclosed in `bio` as Equal team pilot accounts —
+ * not real people, no scraped/stock photos of real faces (avoids
+ * impersonation and reverse-image-search exposure). Avatars are
+ * generated SVG gradient+initial, matching the app's own fallback style.
+ */
+
+const GRADIENT_PAIRS: [string, string][] = [
+  ['#BB83C9', '#7BC4E8'],
+  ['#7DE0B3', '#7BC4E8'],
+  ['#F0B84A', '#BB83C9'],
+  ['#7BC4E8', '#7DE0B3'],
+  ['#BB83C9', '#F0B84A'],
+];
+
+function makeAvatar(name: string, seed: number): string {
+  const [c1, c2] = GRADIENT_PAIRS[seed % GRADIENT_PAIRS.length];
+  const initial = name.charAt(0).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="600" fill="url(#g)"/>
+    <text x="200" y="330" font-family="'Outfit', system-ui, sans-serif" font-size="180" font-weight="700" fill="rgba(255,255,255,0.9)" text-anchor="middle">${initial}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
+const PILOT_TAG = ' — Equal pilot profile 🚀';
+
+const NAMES: { name: string; gender: 'female' | 'male'; interests: string[]; goal: string; bioCore: string }[] = [
+  { name: 'Zofia', gender: 'female', interests: ['Coffee', 'Art', 'Travel'], goal: 'Serious relationship', bioCore: 'Gallery curator exploring Warsaw one exhibition at a time.' },
+  { name: 'Jakub', gender: 'male', interests: ['Music', 'Coding', 'Hiking'], goal: 'Serious relationship', bioCore: 'Backend dev, weekend hiker, terrible singer in the shower.' },
+  { name: 'Kasia', gender: 'female', interests: ['Yoga', 'Books', 'Coffee'], goal: 'Dating', bioCore: 'Yoga instructor with a growing pile of unread novels.' },
+  { name: 'Piotr', gender: 'male', interests: ['Football', 'Cooking', 'Travel'], goal: 'Dating', bioCore: 'Amateur chef, worse footballer, always up for a trip.' },
+  { name: 'Ola', gender: 'female', interests: ['Photography', 'Fashion', 'Art'], goal: 'Interest-based connections', bioCore: 'Photographer chasing golden hour across the city.' },
+  { name: 'Michał', gender: 'male', interests: ['Gaming', 'Tech', 'Music'], goal: 'Not sure yet', bioCore: 'Game dev by trade, synth collector by obsession.' },
+  { name: 'Ania', gender: 'female', interests: ['Dancing', 'Travel', 'Fitness'], goal: 'Dating', bioCore: 'Salsa on weekends, spreadsheets on weekdays.' },
+  { name: 'Tomasz', gender: 'male', interests: ['Cycling', 'Coffee', 'Books'], goal: 'Serious relationship', bioCore: 'Cyclist who measures cities by their coffee shops.' },
+  { name: 'Marta', gender: 'female', interests: ['Cooking', 'Wine', 'Travel'], goal: 'Serious relationship', bioCore: 'Home cook perfecting pierogi recipes, one batch at a time.' },
+  { name: 'Kamil', gender: 'male', interests: ['Startups', 'Fitness', 'Reading'], goal: 'Interest-based connections', bioCore: 'Founder of a small startup, gym in the mornings.' },
+  { name: 'Weronika', gender: 'female', interests: ['Art', 'Music', 'Cinema'], goal: 'Dating', bioCore: 'Art student who never misses a film festival.' },
+  { name: 'Adrian', gender: 'male', interests: ['Hiking', 'Photography', 'Travel'], goal: 'Serious relationship', bioCore: 'Trail runner and amateur landscape photographer.' },
+  { name: 'Natalia', gender: 'female', interests: ['Reading', 'Yoga', 'Coffee'], goal: 'Not sure yet', bioCore: 'Bookshop regular, slowly working through the classics.' },
+  { name: 'Bartek', gender: 'male', interests: ['Music', 'Gaming', 'Cooking'], goal: 'Dating', bioCore: 'DJ on weekends, decent cook on weekdays.' },
+  { name: 'Julia', gender: 'female', interests: ['Fitness', 'Travel', 'Fashion'], goal: 'Serious relationship', bioCore: 'Personal trainer with a serious travel bucket list.' },
+  { name: 'Filip', gender: 'male', interests: ['Chess', 'Books', 'Coffee'], goal: 'Interest-based connections', bioCore: 'Chess club regular, always down for deep conversation.' },
+  { name: 'Magda', gender: 'female', interests: ['Design', 'Art', 'Coffee'], goal: 'Dating', bioCore: 'Product designer sketching in cafes across the city.' },
+  { name: 'Wojciech', gender: 'male', interests: ['Football', 'Travel', 'Music'], goal: 'Serious relationship', bioCore: 'Sports fan, occasional guitarist, frequent flyer.' },
+  { name: 'Ewa', gender: 'female', interests: ['Cooking', 'Hiking', 'Books'], goal: 'Serious relationship', bioCore: 'Weekend hiker who always packs too much food.' },
+  { name: 'Dawid', gender: 'male', interests: ['Tech', 'Fitness', 'Gaming'], goal: 'Dating', bioCore: 'Product manager, gym enthusiast, casual gamer.' },
+  { name: 'Karolina', gender: 'female', interests: ['Dancing', 'Fashion', 'Travel'], goal: 'Interest-based connections', bioCore: 'Ballroom dancer with a closet full of travel souvenirs.' },
+  { name: 'Mateusz', gender: 'male', interests: ['Cycling', 'Music', 'Cooking'], goal: 'Not sure yet', bioCore: 'Cyclist and Sunday-morning bread baker.' },
+  { name: 'Aleksandra', gender: 'female', interests: ['Art', 'Coffee', 'Books'], goal: 'Serious relationship', bioCore: 'Illustrator, coffee snob, chronic over-reader.' },
+  { name: 'Szymon', gender: 'male', interests: ['Startups', 'Travel', 'Photography'], goal: 'Dating', bioCore: 'Building a startup, documenting it all in photos.' },
+  { name: 'Paulina', gender: 'female', interests: ['Yoga', 'Fitness', 'Travel'], goal: 'Dating', bioCore: 'Yoga teacher, always planning the next trip.' },
+  { name: 'Igor', gender: 'male', interests: ['Music', 'Cooking', 'Books'], goal: 'Serious relationship', bioCore: 'Vinyl collector who cooks like it is a competition.' },
+  { name: 'Dominika', gender: 'female', interests: ['Cinema', 'Art', 'Coffee'], goal: 'Interest-based connections', bioCore: 'Film buff, gallery-hopper, coffee-shop regular.' },
+  { name: 'Rafał', gender: 'male', interests: ['Hiking', 'Fitness', 'Tech'], goal: 'Not sure yet', bioCore: 'Trail runner and software engineer, in that order.' },
+  { name: 'Klaudia', gender: 'female', interests: ['Fashion', 'Dancing', 'Music'], goal: 'Dating', bioCore: 'Stylist by day, dance floor regular by night.' },
+  { name: 'Grzegorz', gender: 'male', interests: ['Chess', 'Travel', 'Coffee'], goal: 'Serious relationship', bioCore: 'Slow traveler, slower chess player, fast coffee drinker.' },
 ];
 
 async function main() {
-  console.log('Seeding database with demo profiles...');
+  console.log('Seeding Warsaw pilot profiles...');
 
-  for (const p of PROFILES) {
-    const existing = await prisma.user.findUnique({ where: { username: p.username } });
+  let i = 0;
+  for (const p of NAMES) {
+    const username = `${p.name.toLowerCase().replace(/[^a-z]/g, '')}_pilot`;
+    const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
       console.log(`Skipping ${p.name} — already exists`);
+      i++;
       continue;
     }
 
-    const piUid = `seed_${p.username}`;
+    const age = 22 + (i % 14); // spread 22–35
+    const birthYear = new Date().getFullYear() - age;
+
     const user = await prisma.user.create({
       data: {
-        piUid,
+        piUid: `pilot_${username}`,
         name: p.name,
-        username: p.username,
+        username,
         verified: true,
-        sparkBalance: Math.floor(Math.random() * 50) + 10,
+        sparkBalance: Math.floor(Math.random() * 20) + 5,
         profile: {
           create: {
-            bio: p.bio,
-            city: p.city,
-            birthDate: new Date(p.birthDate),
+            bio: p.bioCore + PILOT_TAG,
+            city: 'Warsaw',
+            birthDate: new Date(`${birthYear}-06-15`),
             gender: p.gender,
-            lookingFor: p.lookingFor,
+            lookingFor: p.gender === 'female' ? ['male'] : ['female'],
             interests: p.interests,
-            goals: p.goals,
+            goals: [p.goal],
           },
         },
       },
     });
 
     await prisma.photo.create({
-      data: { userId: user.id, url: p.photo, isMain: true, order: 0 },
+      data: { userId: user.id, url: makeAvatar(p.name, i), isMain: true, order: 0 },
     });
 
-    console.log(`✓ Created: ${p.name} (${p.city})`);
+    console.log(`✓ Created: ${p.name} (Warsaw, pilot)`);
+    i++;
   }
 
   // Clubs
@@ -152,9 +138,9 @@ async function main() {
   if (eventsExist === 0) {
     await prisma.event.createMany({
       data: [
-        { title: 'Speed Dating Night', description: 'Meet 10+ matches in one evening!', date: new Date('2026-08-01T19:00:00Z'), location: 'The Social Hub, NYC', category: 'Social', attendeeCount: 24 },
-        { title: 'Sunset Hike & Picnic', description: 'Scenic hike followed by a group picnic.', date: new Date('2026-08-15T17:00:00Z'), location: 'Lands End Trail, SF', category: 'Outdoor', attendeeCount: 18 },
-        { title: 'Pi Pioneers Meetup', description: 'IRL meetup for Pi Network community members.', date: new Date('2026-09-01T14:00:00Z'), location: 'WeWork, Berlin', category: 'Community', attendeeCount: 62 },
+        { title: 'Speed Dating Night', description: 'Meet 10+ matches in one evening!', date: new Date('2026-08-01T19:00:00Z'), location: 'Warsaw Old Town', category: 'Social', attendeeCount: 24 },
+        { title: 'Vistula Riverside Picnic', description: 'Scenic riverside picnic and games.', date: new Date('2026-08-15T17:00:00Z'), location: 'Vistula Boulevards, Warsaw', category: 'Outdoor', attendeeCount: 18 },
+        { title: 'Pi Pioneers Meetup', description: 'IRL meetup for Pi Network community members.', date: new Date('2026-09-01T14:00:00Z'), location: 'Warsaw Spire', category: 'Community', attendeeCount: 62 },
       ],
     });
   }
