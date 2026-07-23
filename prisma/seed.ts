@@ -72,6 +72,21 @@ const NAMES: { name: string; gender: 'female' | 'male'; interests: string[]; goa
 async function main() {
   console.log('Seeding Warsaw pilot profiles...');
 
+  // Remove any pilot accounts whose names are no longer in NAMES (e.g. old male pilots)
+  const validUsernames = new Set(
+    NAMES.map(p => `${p.name.toLowerCase().replace(/[^a-z]/g, '')}_pilot`)
+  );
+  const stalePilots = await prisma.user.findMany({
+    where: { username: { endsWith: '_pilot' } },
+    select: { id: true, username: true },
+  });
+  for (const u of stalePilots) {
+    if (!validUsernames.has(u.username)) {
+      await prisma.user.delete({ where: { id: u.id } });
+      console.log(`🗑  Removed stale pilot: ${u.username}`);
+    }
+  }
+
   let i = 0;
   for (const p of NAMES) {
     const username = `${p.name.toLowerCase().replace(/[^a-z]/g, '')}_pilot`;
