@@ -45,10 +45,20 @@ export class ProfilesService {
 
     const myInterests = new Set(myProfile?.interests ?? []);
     const norm = (s: string) => s.trim().toLowerCase();
-    const OPEN = new Set(['everyone', 'all', 'any']);
-    const myGender = myProfile?.gender ? norm(myProfile.gender) : null;
-    const mySeeking = (myProfile?.lookingFor ?? []).map(norm).filter(Boolean);
-    const iAmOpen = mySeeking.length === 0 || mySeeking.some((g) => OPEN.has(g));
+    const OPEN = 'everyone';
+    // gender is stored singular ("woman"), lookingFor plural ("women") — both must
+    // collapse to one token or nothing ever matches. Also tolerates legacy values.
+    const canon = (raw: string): string => {
+      const s = norm(raw);
+      if (['woman', 'women', 'female', 'f'].includes(s)) return 'woman';
+      if (['man', 'men', 'male', 'm'].includes(s)) return 'man';
+      if (['nonbinary', 'non-binary', 'nb', 'enby'].includes(s)) return 'nonbinary';
+      if (['everyone', 'all', 'any', 'both'].includes(s)) return OPEN;
+      return s;
+    };
+    const myGender = myProfile?.gender ? canon(myProfile.gender) : null;
+    const mySeeking = (myProfile?.lookingFor ?? []).map(canon).filter(Boolean);
+    const iAmOpen = mySeeking.length === 0 || mySeeking.includes(OPEN);
 
     // Age range -> birthDate window (older age == earlier birthDate)
     const ageMin = filters.ageMin ? parseInt(filters.ageMin, 10) : NaN;
@@ -78,9 +88,9 @@ export class ProfilesService {
     const maxDistance = filters.maxDistance ? parseInt(filters.maxDistance, 10) : NaN;
 
     const profiles = candidates.filter((user: any) => {
-      const theirGender = user.profile?.gender ? norm(user.profile.gender) : null;
-      const theirSeeking = (user.profile?.lookingFor ?? []).map(norm).filter(Boolean);
-      const theyAreOpen = theirSeeking.length === 0 || theirSeeking.some((g: string) => OPEN.has(g));
+      const theirGender = user.profile?.gender ? canon(user.profile.gender) : null;
+      const theirSeeking = (user.profile?.lookingFor ?? []).map(canon).filter(Boolean);
+      const theyAreOpen = theirSeeking.length === 0 || theirSeeking.includes(OPEN);
 
       // Do they match what I'm looking for? (skip when either side hasn't said)
       if (!iAmOpen && theirGender && !mySeeking.includes(theirGender)) return false;
