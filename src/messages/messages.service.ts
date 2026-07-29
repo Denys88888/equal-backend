@@ -17,16 +17,50 @@ export class MessagesService {
 
   async getMessages(matchId: string, userId: string, limit = 50) {
     const match = await this.verifyParticipant(matchId, userId);
-    const messages = await this.prisma.message.findMany({
-      where: { matchId },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
     const partnerId = match.user1Id === userId ? match.user2Id : match.user1Id;
-    const partner = await this.prisma.user.findUnique({
-      where: { id: partnerId },
-      include: { photos: { orderBy: { order: 'asc' }, take: 1 } },
-    });
+    const [messages, partner, myProfile] = await Promise.all([
+      this.prisma.message.findMany({
+        where: { matchId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+      this.prisma.user.findUnique({
+        where: { id: partnerId },
+        include: { photos: { orderBy: { order: 'asc' }, take: 1 }, profile: { select: { interests: true } } },
+      }),
+      this.prisma.profile.findUnique({ where: { userId }, select: { interests: true } }),
+    ]);
+
+    const myInterests: string[] = myProfile?.interests ?? [];
+    const theirInterests: string[] = partner?.profile?.interests ?? [];
+    const sharedInterests = theirInterests.filter((i) => myInterests.includes(i));
+
+    const TEMPLATES: Record<string, string[]> = {
+      Hiking: ["Favorite trail you've hiked?", "Best hike you've done so far?"],
+      Coffee: ["Best coffee spot in your city?", "Espresso or pour-over?"],
+      Music: ["Favorite artist right now?", "Last concert you went to?"],
+      Travel: ["Top destination on your list?", "Best trip you've taken?"],
+      Photography: ["Film or digital?", "Favorite subject to photograph?"],
+      Cooking: ["Signature dish you make?", "Sweet or savory?"],
+      Reading: ["Last book you couldn't put down?", "Fiction or non-fiction?"],
+      Gaming: ["Favorite game right now?", "Console or PC?"],
+      Yoga: ["Morning or evening yoga?", "How long have you practiced?"],
+      Dogs: ["Tell me about your dog!", "Favorite dog breed?"],
+      Cats: ["How many cats do you have?", "Any funny cat stories?"],
+      Fitness: ["Favorite workout?", "Gym or outdoors?"],
+      Art: ["Do you create art yourself?", "Favorite art style?"],
+      Movies: ["Last movie that blew you away?", "Favorite genre?"],
+      Netflix: ["Current show you're binging?", "Best Netflix series ever?"],
+    };
+    const icebreakers: string[] = [];
+    for (const interest of sharedInterests.slice(0, 3)) {
+      const tpls = TEMPLATES[interest];
+      if (tpls) icebreakers.push(tpls[0]);
+    }
+    if (icebreakers.length === 0 && partner?.name) {
+      icebreakers.push(`Hey ${partner.name}! What's something fun you did recently?`);
+    }
+
     const normalized = messages.reverse().map((m) => ({
       id: m.id,
       type: m.type,
@@ -42,9 +76,9 @@ export class MessagesService {
       matchName: partner?.name || '',
       matchAvatar: partner?.photos[0]?.url || '',
       isOnline: false,
-      isVerified: false,
-      sharedInterests: [],
-      icebreakers: [],
+      isVerified: partner?.verified ?? false,
+      sharedInterests,
+      icebreakers,
     };
   }
 
