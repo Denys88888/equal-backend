@@ -12,6 +12,10 @@ import * as fs from 'fs';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Render terminates TLS at its proxy; without this req.ip is the proxy hop,
+  // not the client. ThrottlerProxyGuard reads the forwarded headers directly.
+  app.set('trust proxy', 1);
+
   // Serve locally-stored uploads (fallback when Cloudinary is not configured)
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
