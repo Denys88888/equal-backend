@@ -33,11 +33,25 @@ export class ClubsService {
   }
 
   async getPosts(clubId: string) {
-    return this.prisma.clubPost.findMany({
+    const posts = await this.prisma.clubPost.findMany({
       where: { clubId },
       orderBy: { createdAt: 'desc' },
       take: 50,
+      include: {
+        author: {
+          select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } },
+        },
+      },
     });
+    return posts.map((p) => ({
+      id: p.id,
+      clubId: p.clubId,
+      authorId: p.authorId,
+      authorName: p.author.name,
+      authorAvatar: p.author.photos[0]?.url ?? '',
+      content: p.content,
+      createdAt: p.createdAt,
+    }));
   }
 
   async createPost(clubId: string, authorId: string, content: string) {
