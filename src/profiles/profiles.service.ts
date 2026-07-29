@@ -15,21 +15,91 @@ export class ProfilesService {
     return this.prisma.profile.findUnique({ where: { userId } });
   }
 
-  async discover(userId: string, _filters: Record<string, string>) {
+  /** Great-circle distance in km. */
+  private haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  async discover(userId: string, filters: Record<string, string>) {
     const excludeIds = [userId];
-    const [alreadySwiped, myProfile] = await Promise.all([
+    const [alreadySwiped, blockedMe, myProfile] = await Promise.all([
       this.prisma.swipeAction.findMany({ where: { userId }, select: { targetId: true } }),
-      this.prisma.profile.findUnique({ where: { userId }, select: { interests: true, latitude: true, longitude: true } }),
+      // People who blocked me must not surface in my deck either
+      this.prisma.swipeAction.findMany({
+        where: { targetId: userId, action: 'block' },
+        select: { userId: true },
+      }),
+      this.prisma.profile.findUnique({
+        where: { userId },
+        select: { interests: true, latitude: true, longitude: true, gender: true, lookingFor: true },
+      }),
     ]);
     excludeIds.push(...alreadySwiped.map((s: { targetId: string }) => s.targetId));
+    excludeIds.push(...blockedMe.map((s: { userId: string }) => s.userId));
 
     const myInterests = new Set(myProfile?.interests ?? []);
+    const norm = (s: string) => s.trim().toLowerCase();
+    const OPEN = new Set(['everyone', 'all', 'any']);
+    const myGender = myProfile?.gender ? norm(myProfile.gender) : null;
+    const mySeeking = (myProfile?.lookingFor ?? []).map(norm).filter(Boolean);
+    const iAmOpen = mySeeking.length === 0 || mySeeking.some((g) => OPEN.has(g));
 
-    const profiles = await this.prisma.user.findMany({
-      where: { id: { notIn: excludeIds } },
-      take: 20,
+    // Age range -> birthDate window (older age == earlier birthDate)
+    const ageMin = filters.ageMin ? parseInt(filters.ageMin, 10) : NaN;
+    const ageMax = filters.ageMax ? parseInt(filters.ageMax, 10) : NaN;
+    const birthDateFilter: { gte?: Date; lte?: Date } = {};
+    if (!isNaN(ageMax)) birthDateFilter.gte = new Date(Date.now() - (ageMax + 1) * 31536000000);
+    if (!isNaN(ageMin)) birthDateFilter.lte = new Date(Date.now() - ageMin * 31536000000);
+
+    const wantedInterests = filters.interests
+      ? filters.interests.split(',').map(norm).filter(Boolean)
+      : [];
+
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        id: { notIn: excludeIds },
+        isActive: true,
+        ...(filters.verifiedOnly === 'true' ? { verified: true } : {}),
+        ...(Object.keys(birthDateFilter).length
+          ? { profile: { birthDate: birthDateFilter } }
+          : {}),
+      },
+      // Over-fetch: mutual-preference and distance narrowing happen in JS below.
+      take: 100,
       include: { profile: true, photos: { orderBy: { order: 'asc' } } },
     });
+
+    const maxDistance = filters.maxDistance ? parseInt(filters.maxDistance, 10) : NaN;
+
+    const profiles = candidates.filter((user: any) => {
+      const theirGender = user.profile?.gender ? norm(user.profile.gender) : null;
+      const theirSeeking = (user.profile?.lookingFor ?? []).map(norm).filter(Boolean);
+      const theyAreOpen = theirSeeking.length === 0 || theirSeeking.some((g: string) => OPEN.has(g));
+
+      // Do they match what I'm looking for? (skip when either side hasn't said)
+      if (!iAmOpen && theirGender && !mySeeking.includes(theirGender)) return false;
+      // Do I match what they're looking for? Mutual, so nobody sees an impossible match.
+      if (!theyAreOpen && myGender && !theirSeeking.includes(myGender)) return false;
+
+      if (wantedInterests.length) {
+        const theirs = (user.profile?.interests ?? []).map(norm);
+        if (!wantedInterests.some((i) => theirs.includes(i))) return false;
+      }
+
+      if (!isNaN(maxDistance) && myProfile?.latitude != null && myProfile?.longitude != null
+          && user.profile?.latitude != null && user.profile?.longitude != null) {
+        if (this.haversine(myProfile.latitude, myProfile.longitude, user.profile.latitude, user.profile.longitude) > maxDistance) {
+          return false;
+        }
+      }
+      return true;
+    }).slice(0, 20);
 
     return profiles.map((user: any) => {
       // Jaccard similarity: |intersection| / |union| * 100
@@ -39,14 +109,11 @@ export class ProfilesService {
       const compatibility = union > 0 ? Math.round((intersection / union) * 100) : 50;
 
       // Real distance if both have coordinates, else null
-      let distance: number | null = null;
-      if (myProfile?.latitude && myProfile?.longitude && user.profile?.latitude && user.profile?.longitude) {
-        const R = 6371;
-        const dLat = (user.profile.latitude - myProfile.latitude) * Math.PI / 180;
-        const dLon = (user.profile.longitude - myProfile.longitude) * Math.PI / 180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(myProfile.latitude * Math.PI/180) * Math.cos(user.profile.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
-        distance = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-      }
+      const distance =
+        myProfile?.latitude != null && myProfile?.longitude != null &&
+        user.profile?.latitude != null && user.profile?.longitude != null
+          ? Math.round(this.haversine(myProfile.latitude, myProfile.longitude, user.profile.latitude, user.profile.longitude))
+          : null;
 
       return {
         id: user.id,
@@ -79,10 +146,37 @@ export class ProfilesService {
       if (isNaN(d.getTime())) delete profileData.birthDate;
       else profileData.birthDate = d;
     }
-    return this.prisma.profile.upsert({
+    // Store gender/lookingFor lowercase so matching never depends on client casing
+    if (typeof profileData.gender === 'string') {
+      profileData.gender = profileData.gender.trim().toLowerCase();
+    }
+    if (Array.isArray(profileData.lookingFor)) {
+      profileData.lookingFor = (profileData.lookingFor as string[])
+        .map((g) => String(g).trim().toLowerCase())
+        .filter(Boolean);
+    }
+
+    const saved = await this.prisma.profile.upsert({
       where: { userId },
       update: profileData,
       create: { userId, ...profileData },
+    });
+
+    // Recompute completeness so the profile_complete reward has something to verify
+    const photoCount = await this.prisma.photo.count({ where: { userId } });
+    const checks = [
+      !!saved.bio,
+      !!saved.birthDate,
+      !!saved.city,
+      !!saved.gender,
+      saved.interests.length >= 3,
+      saved.goals.length > 0,
+      photoCount > 0,
+    ];
+    const completionPercent = Math.round((checks.filter(Boolean).length / checks.length) * 100);
+    return this.prisma.profile.update({
+      where: { userId },
+      data: { completionPercent, profileComplete: completionPercent === 100 },
     });
   }
 

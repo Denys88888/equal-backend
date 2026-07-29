@@ -35,6 +35,7 @@ model User {
   matches2  Match[] @relation("MatchUser2")
   payments  Payment[]
   clubPosts ClubPost[]
+  sparkEarns SparkEarn[]
 }
 
 model Profile {
@@ -90,10 +91,13 @@ model Message {
   sender   User   @relation("SenderMessages", fields: [senderId], references: [id])
   content  String
   type     MessageType @default(TEXT)
+  giftType String?
   read     Boolean @default(false)
   createdAt DateTime @default(now())
 
   match    Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt])
 }
 
 model Club {
@@ -162,6 +166,19 @@ model EventRsvp {
   user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+}
+
+model SparkEarn {
+  id        String @id @default(cuid())
+  userId    String
+  action    String
+  amount    Int
+  dedupeKey String @unique
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, action])
 }
 
 model SwipeAction {

@@ -1,10 +1,15 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushService } from '../users/push.service';
+import { ChatGateway } from '../gateway/chat.gateway';
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService, private push: PushService) {}
+  constructor(
+    private prisma: PrismaService,
+    private push: PushService,
+    private gateway: ChatGateway,
+  ) {}
 
   private async verifyParticipant(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({ where: { id: matchId } });
@@ -13,6 +18,20 @@ export class MessagesService {
       throw new ForbiddenException('Not your match');
     }
     return match;
+  }
+
+  /** A block in either direction closes the conversation for both sides. */
+  private async assertNotBlocked(matchId: string, userId: string, partnerId: string) {
+    const block = await this.prisma.swipeAction.findFirst({
+      where: {
+        action: 'block',
+        OR: [
+          { userId, targetId: partnerId },
+          { userId: partnerId, targetId: userId },
+        ],
+      },
+    });
+    if (block) throw new ForbiddenException('Conversation is blocked');
   }
 
   async getMessages(matchId: string, userId: string, limit = 50) {
@@ -61,13 +80,21 @@ export class MessagesService {
       icebreakers.push(`Hey ${partner.name}! What's something fun you did recently?`);
     }
 
+    // Opening the conversation clears the unread badge for the partner's messages.
+    // Without this, Message.read stays false forever and unreadCount never drops.
+    await this.prisma.message.updateMany({
+      where: { matchId, senderId: { not: userId }, read: false },
+      data: { read: true },
+    });
+
     const normalized = messages.reverse().map((m) => ({
       id: m.id,
       type: m.type,
       content: m.content,
+      giftType: m.giftType,
       sender: m.senderId === userId ? 'me' : 'them',
       timestamp: m.createdAt,
-      read: true,
+      read: m.read,
     }));
     return {
       messages: normalized,
@@ -82,15 +109,29 @@ export class MessagesService {
     };
   }
 
-  async create(matchId: string, senderId: string, content: string, type = 'TEXT') {
+  async create(matchId: string, senderId: string, content: string, type = 'TEXT', giftType?: string) {
     const match = await this.verifyParticipant(matchId, senderId);
+    const recipientId = match.user1Id === senderId ? match.user2Id : match.user1Id;
+    await this.assertNotBlocked(matchId, senderId, recipientId);
+
     const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'GIFT' | 'SYSTEM';
     const message = await this.prisma.message.create({
-      data: { matchId, senderId, content, type: msgType },
+      data: { matchId, senderId, content, type: msgType, giftType: giftType ?? null },
+    });
+
+    // Real-time delivery: the REST route is the only path the client uses to send,
+    // so it must be what emits. Without this the partner sees nothing until reload.
+    this.gateway.server?.to(`match:${matchId}`).emit('message:new', {
+      id: message.id,
+      matchId,
+      senderId,
+      content,
+      type: msgType,
+      giftType: message.giftType,
+      timestamp: message.createdAt,
     });
 
     // Push notification to the other participant
-    const recipientId = match.user1Id === senderId ? match.user2Id : match.user1Id;
     const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
     this.push.sendToUser(recipientId, {
       title: `New message from ${sender?.name || 'Someone'}`,

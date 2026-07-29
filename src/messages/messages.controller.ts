@@ -23,8 +23,8 @@ export class MessagesController {
   async sendMessage(
     @Request() req: { user: { id: string } },
     @Param('matchId') matchId: string,
-    @Body() body: { content: string; type?: string },
+    @Body() body: { content: string; type?: string; giftType?: string },
   ) {
-    return this.messagesService.create(matchId, req.user.id, body.content, body.type);
+    return this.messagesService.create(matchId, req.user.id, body.content, body.type, body.giftType);
   }
 }
