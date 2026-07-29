@@ -17,11 +17,13 @@ export class ProfilesService {
 
   async discover(userId: string, _filters: Record<string, string>) {
     const excludeIds = [userId];
-    const alreadySwiped = await this.prisma.swipeAction.findMany({
-      where: { userId },
-      select: { targetId: true },
-    });
+    const [alreadySwiped, myProfile] = await Promise.all([
+      this.prisma.swipeAction.findMany({ where: { userId }, select: { targetId: true } }),
+      this.prisma.profile.findUnique({ where: { userId }, select: { interests: true, latitude: true, longitude: true } }),
+    ]);
     excludeIds.push(...alreadySwiped.map((s: { targetId: string }) => s.targetId));
+
+    const myInterests = new Set(myProfile?.interests ?? []);
 
     const profiles = await this.prisma.user.findMany({
       where: { id: { notIn: excludeIds } },
@@ -29,22 +31,40 @@ export class ProfilesService {
       include: { profile: true, photos: { orderBy: { order: 'asc' } } },
     });
 
-    return profiles.map((user: any) => ({
-      id: user.id,
-      name: user.name,
-      age: user.profile?.birthDate
-        ? Math.floor((Date.now() - new Date(user.profile.birthDate).getTime()) / 31536000000)
-        : null,
-      distance: Math.floor(Math.random() * 49) + 1,
-      compatibility: Math.floor(Math.random() * 21) + 75,
-      photo: user.photos[0]?.url || '',
-      photos: user.photos.map((p: { url: string }) => p.url),
-      bio: user.profile?.bio || '',
-      interests: user.profile?.interests || [],
-      verified: user.verified ?? false,
-      activeNow: false,
-      isNew: false,
-    }));
+    return profiles.map((user: any) => {
+      // Jaccard similarity: |intersection| / |union| * 100
+      const theirInterests: string[] = user.profile?.interests ?? [];
+      const intersection = theirInterests.filter((i: string) => myInterests.has(i)).length;
+      const union = new Set([...myInterests, ...theirInterests]).size;
+      const compatibility = union > 0 ? Math.round((intersection / union) * 100) : 50;
+
+      // Real distance if both have coordinates, else null
+      let distance: number | null = null;
+      if (myProfile?.latitude && myProfile?.longitude && user.profile?.latitude && user.profile?.longitude) {
+        const R = 6371;
+        const dLat = (user.profile.latitude - myProfile.latitude) * Math.PI / 180;
+        const dLon = (user.profile.longitude - myProfile.longitude) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(myProfile.latitude * Math.PI/180) * Math.cos(user.profile.latitude * Math.PI/180) * Math.sin(dLon/2)**2;
+        distance = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+      }
+
+      return {
+        id: user.id,
+        name: user.name,
+        age: user.profile?.birthDate
+          ? Math.floor((Date.now() - new Date(user.profile.birthDate).getTime()) / 31536000000)
+          : null,
+        distance,
+        compatibility,
+        photo: user.photos[0]?.url || '',
+        photos: user.photos.map((p: { url: string }) => p.url),
+        bio: user.profile?.bio || '',
+        interests: user.profile?.interests || [],
+        verified: user.verified ?? false,
+        activeNow: false,
+        isNew: false,
+      };
+    });
   }
 
   async updateProfile(userId: string, data: Record<string, unknown>) {
