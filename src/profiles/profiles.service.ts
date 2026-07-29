@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { PushService } from '../users/push.service';
@@ -191,6 +191,25 @@ export class ProfilesService {
   }
 
   async swipe(userId: string, targetUserId: string, action: string) {
+    if (userId === targetUserId) throw new BadRequestException('Cannot swipe on yourself');
+
+    // Sparks are consumed here and nowhere else — the client used to call
+    // /sparks/spend separately, which both double-charged and let a tampered
+    // client super-like on an empty balance.
+    let sparkBalance: number | undefined;
+    if (action === 'spark') {
+      const consumed = await this.prisma.user.updateMany({
+        where: { id: userId, sparkBalance: { gte: 1 } },
+        data: { sparkBalance: { decrement: 1 } },
+      });
+      if (consumed.count === 0) throw new BadRequestException('Not enough sparks');
+      const fresh = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { sparkBalance: true },
+      });
+      sparkBalance = fresh?.sparkBalance ?? 0;
+    }
+
     await this.prisma.swipeAction.upsert({
       where: { userId_targetId: { userId, targetId: targetUserId } },
       update: { action },
@@ -220,11 +239,11 @@ export class ProfilesService {
             tag: `match-${match.id}`,
           }).catch(() => {});
 
-          return { success: true, isMatch: true, matchId: match.id };
+          return { success: true, isMatch: true, matchId: match.id, sparkBalance };
         }
-        return { success: true, isMatch: true, matchId: existing.id };
+        return { success: true, isMatch: true, matchId: existing.id, sparkBalance };
       }
     }
-    return { success: true, isMatch: false };
+    return { success: true, isMatch: false, sparkBalance };
   }
 }
