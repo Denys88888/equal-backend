@@ -30,11 +30,30 @@ export class UploadService {
       });
       return result.secure_url;
     }
+    return this.saveLocal(file);
+  }
 
-    // Fallback: save to local /uploads (development / Render without Cloudinary)
+  /** Voice notes. Cloudinary serves audio under resource_type 'video'. */
+  async uploadAudio(file: Express.Multer.File, userId: string): Promise<string> {
+    if (this.useCloudinary) {
+      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: `equal/${userId}/voice`, resource_type: 'video' },
+          (err, res) => { if (err || !res) reject(err); else resolve(res); },
+        );
+        uploadStream.end(file.buffer);
+      });
+      return result.secure_url;
+    }
+    return this.saveLocal(file);
+  }
+
+  /** Fallback: save to local /uploads (development / Render without Cloudinary) */
+  private saveLocal(file: Express.Multer.File): string {
     const uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    const filename = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const safeName = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filename = `${Date.now()}-${safeName}`;
     fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
     return `/uploads/${filename}`;
   }
