@@ -128,7 +128,10 @@ export class MessagesService {
       content,
       type: msgType,
       giftType: message.giftType,
-      timestamp: message.createdAt,
+      // Clients read createdAt (matching the gateway's own message:send shape);
+      // timestamp is kept as an alias so either field works.
+      createdAt: message.createdAt.toISOString(),
+      timestamp: message.createdAt.toISOString(),
     });
 
     // Push notification to the other participant
