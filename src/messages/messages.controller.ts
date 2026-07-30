@@ -51,4 +51,22 @@ export class MessagesController {
     const url = await this.uploadService.uploadAudio(file, req.user.id);
     return this.messagesService.create(matchId, req.user.id, url, 'VOICE');
   }
+
+  @Post('image')
+  @UseInterceptors(FileInterceptor('image', {
+    storage: memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 },
+  }))
+  async sendImage(
+    @Request() req: { user: { id: string } },
+    @Param('matchId') matchId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('No image file provided');
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('File must be an image');
+    }
+    const url = await this.uploadService.uploadPhoto(file, req.user.id);
+    return this.messagesService.create(matchId, req.user.id, url, 'IMAGE');
+  }
 }

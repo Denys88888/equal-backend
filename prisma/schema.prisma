@@ -235,6 +235,7 @@ enum Role {
 enum MessageType {
   TEXT
   VOICE
+  IMAGE
   GIFT
   SYSTEM
 }

@@ -114,7 +114,7 @@ export class MessagesService {
     const recipientId = match.user1Id === senderId ? match.user2Id : match.user1Id;
     await this.assertNotBlocked(matchId, senderId, recipientId);
 
-    const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'GIFT' | 'SYSTEM';
+    const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'IMAGE' | 'GIFT' | 'SYSTEM';
     const message = await this.prisma.message.create({
       data: { matchId, senderId, content, type: msgType, giftType: giftType ?? null },
     });
@@ -134,11 +134,19 @@ export class MessagesService {
       timestamp: message.createdAt.toISOString(),
     });
 
-    // Push notification to the other participant
+    // Push notification to the other participant. Media messages store a URL in
+    // `content`, so only TEXT is safe to preview verbatim.
+    const preview =
+      msgType === 'TEXT'
+        ? content.length > 80 ? content.slice(0, 80) + '…' : content
+        : msgType === 'VOICE' ? '🎤 Voice message'
+        : msgType === 'IMAGE' ? '📷 Photo'
+        : msgType === 'GIFT' ? '🎁 Sent you a gift'
+        : 'New message';
     const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
     this.push.sendToUser(recipientId, {
       title: `New message from ${sender?.name || 'Someone'}`,
-      body: content.length > 80 ? content.slice(0, 80) + '…' : content,
+      body: preview,
       url: `/#/chat/${matchId}`,
       tag: `msg-${matchId}`,
     }).catch(() => {});
