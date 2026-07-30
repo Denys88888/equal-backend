@@ -79,6 +79,71 @@ export class AdminService {
     return { success: true, verified };
   }
 
+  // ── Clubs & events moderation ───────────────────────────
+
+  async getClubs() {
+    const clubs = await this.prisma.club.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { _count: { select: { members: true, posts: true } } },
+    });
+    return clubs.map((c) => ({
+      id: c.id,
+      name: c.name,
+      category: c.category,
+      memberCount: c._count.members,
+      postCount: c._count.posts,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  async deleteClub(clubId: string) {
+    const club = await this.prisma.club.findUnique({ where: { id: clubId }, select: { id: true } });
+    if (!club) throw new NotFoundException('Club not found');
+    // Members and posts cascade from Club
+    await this.prisma.club.delete({ where: { id: clubId } });
+    return { success: true };
+  }
+
+  async getEvents() {
+    const events = await this.prisma.event.findMany({
+      orderBy: { date: 'desc' },
+      take: 100,
+      include: { _count: { select: { rsvps: true } } },
+    });
+    const now = Date.now();
+    return events.map((e) => ({
+      id: e.id,
+      name: e.title,
+      date: e.date,
+      location: e.location ?? '',
+      attendees: e._count.rsvps,
+      featured: e.featured,
+      status: e.date.getTime() > now ? 'Upcoming' : 'Past',
+    }));
+  }
+
+  async deleteEvent(eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!event) throw new NotFoundException('Event not found');
+    await this.prisma.event.delete({ where: { id: eventId } });
+    return { success: true };
+  }
+
+  async toggleEventFeatured(eventId: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { featured: true },
+    });
+    if (!event) throw new NotFoundException('Event not found');
+    const updated = await this.prisma.event.update({
+      where: { id: eventId },
+      data: { featured: !event.featured },
+      select: { featured: true },
+    });
+    return { success: true, featured: updated.featured };
+  }
+
   /** Maps the UI's action names onto ReportStatus. */
   async resolveReport(reportId: string, action: string) {
     const status = action === 'dismiss' ? 'DISMISSED' : 'RESOLVED';

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminService } from './admin.service';
@@ -86,6 +86,39 @@ export class AdminController {
   ) {
     this.checkAdmin(req);
     return this.adminService.setVerified(id, body.verified ?? true);
+  }
+
+  // Clubs / events moderation. The admin UI had these panels running entirely on
+  // MOCK_CLUBS / MOCK_EVENTS with no API behind them.
+
+  @Get('clubs')
+  async getClubs(@Request() req: { user: { role?: string } }) {
+    this.checkAdmin(req);
+    return this.adminService.getClubs();
+  }
+
+  @Delete('clubs/:id')
+  async deleteClub(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
+    this.checkAdmin(req);
+    return this.adminService.deleteClub(id);
+  }
+
+  @Get('events')
+  async getEvents(@Request() req: { user: { role?: string } }) {
+    this.checkAdmin(req);
+    return this.adminService.getEvents();
+  }
+
+  @Delete('events/:id')
+  async deleteEvent(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
+    this.checkAdmin(req);
+    return this.adminService.deleteEvent(id);
+  }
+
+  @Post('events/:id/feature')
+  async featureEvent(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
+    this.checkAdmin(req);
+    return this.adminService.toggleEventFeatured(id);
   }
 
   @Post('reports/:id/resolve')

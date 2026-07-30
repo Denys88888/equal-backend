@@ -152,6 +152,7 @@ model Event {
   price        Float @default(0)
   maxAttendees Int?
   attendeeCount Int @default(0)
+  featured     Boolean @default(false)
   createdAt    DateTime @default(now())
 
   rsvps        EventRsvp[]
