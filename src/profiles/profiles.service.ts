@@ -138,7 +138,7 @@ export class ProfilesService {
         bio: user.profile?.bio || '',
         interests: user.profile?.interests || [],
         verified: user.verified ?? false,
-        activeNow: false,
+        activeNow: this.gateway.isOnline(user.id),
         isNew: false,
       };
     });

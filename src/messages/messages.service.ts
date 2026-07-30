@@ -102,7 +102,7 @@ export class MessagesService {
       partnerId,
       matchName: partner?.name || '',
       matchAvatar: partner?.photos[0]?.url || '',
-      isOnline: false,
+      isOnline: this.gateway.isOnline(partnerId),
       isVerified: partner?.verified ?? false,
       sharedInterests,
       icebreakers,

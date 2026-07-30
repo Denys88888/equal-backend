@@ -1,9 +1,13 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChatGateway } from '../gateway/chat.gateway';
 
 @Injectable()
 export class MatchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: ChatGateway,
+  ) {}
 
   async getMatches(userId: string) {
     const [matches, myProfile] = await Promise.all([
@@ -54,7 +58,7 @@ export class MatchesService {
         createdAt: match.createdAt,
         isNew: ageMs < 24 * 60 * 60 * 1000,
         hasConversation: match.messages.length > 0,
-        isOnline: false,
+        isOnline: this.gateway.isOnline(partner.id),
         sparkUsed: false,
         unreadCount: unreadMap[match.id] ?? 0,
         lastMessage: lastMsg?.content,

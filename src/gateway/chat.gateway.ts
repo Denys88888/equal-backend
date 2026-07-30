@@ -6,75 +6,167 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+
+/** Socket with the identity we resolved from the handshake token. */
+type AuthedSocket = Socket & { userId?: string };
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
 
-  handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+  /** userId -> number of live sockets. Multiple tabs/devices count separately. */
+  private readonly online = new Map<string, number>();
+
+  constructor(
+    private jwt: JwtService,
+    private prisma: PrismaService,
+  ) {}
+
+  /**
+   * The client sends its JWT as handshake auth.token. Previously nothing was
+   * verified: join:user took a caller-supplied userId and join:match a
+   * caller-supplied matchId, so anyone could sit in a stranger's conversation
+   * room and read messages as they were sent.
+   */
+  async handleConnection(client: AuthedSocket) {
+    const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '');
+    if (!token) {
+      client.disconnect(true);
+      return;
+    }
+    try {
+      const payload = await this.jwt.verifyAsync(token, { secret: process.env.JWT_SECRET });
+      const userId = payload?.sub ?? payload?.id ?? payload?.userId;
+      if (!userId) throw new Error('no subject in token');
+      client.userId = userId;
+      // Own room, so the server can always reach this user without trusting input
+      client.join(`user:${userId}`);
+      this.markOnline(userId);
+    } catch {
+      client.disconnect(true);
+    }
   }
 
-  handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+  handleDisconnect(client: AuthedSocket) {
+    if (client.userId) this.markOffline(client.userId);
   }
 
-  // ── User & Match rooms ────────────────────────────────
+  // ── Presence ──────────────────────────────────────────
 
-  @SubscribeMessage('join:user')
-  handleJoinUser(client: Socket, userId: string) {
-    client.join(`user:${userId}`);
-    return { event: 'joined:user', userId };
+  private markOnline(userId: string) {
+    const next = (this.online.get(userId) ?? 0) + 1;
+    this.online.set(userId, next);
+    if (next === 1) this.broadcastPresence(userId, true);
   }
+
+  private markOffline(userId: string) {
+    const next = (this.online.get(userId) ?? 1) - 1;
+    if (next <= 0) {
+      this.online.delete(userId);
+      this.broadcastPresence(userId, false);
+    } else {
+      this.online.set(userId, next);
+    }
+  }
+
+  /** Tell this user's matches that their status changed. */
+  private async broadcastPresence(userId: string, isOnline: boolean) {
+    try {
+      const matches = await this.prisma.match.findMany({
+        where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+        select: { user1Id: true, user2Id: true },
+      });
+      for (const m of matches) {
+        const partnerId = m.user1Id === userId ? m.user2Id : m.user1Id;
+        this.server?.to(`user:${partnerId}`).emit('presence:update', { userId, isOnline });
+      }
+    } catch {
+      // presence is best-effort; never let it break the connection lifecycle
+    }
+  }
+
+  isOnline(userId: string): boolean {
+    return this.online.has(userId);
+  }
+
+  onlineUserIds(): string[] {
+    return [...this.online.keys()];
+  }
+
+  // ── Rooms ─────────────────────────────────────────────
 
   @SubscribeMessage('join:match')
-  handleJoinMatch(client: Socket, matchId: string) {
+  async handleJoinMatch(client: AuthedSocket, matchId: string) {
+    if (!client.userId || typeof matchId !== 'string') return { event: 'error' };
+    // Membership is checked against the DB — never taken on the client's word
+    const match = await this.prisma.match.findFirst({
+      where: {
+        id: matchId,
+        OR: [{ user1Id: client.userId }, { user2Id: client.userId }],
+      },
+      select: { id: true },
+    });
+    if (!match) return { event: 'error', reason: 'not a participant' };
     client.join(`match:${matchId}`);
     return { event: 'joined', matchId };
   }
 
-  // ── Chat ──────────────────────────────────────────────
-
-  @SubscribeMessage('message:send')
-  handleMessage(client: Socket, payload: { matchId: string; content: string; senderId: string }) {
-    this.server.to(`match:${payload.matchId}`).emit('message:new', {
-      matchId: payload.matchId,
-      content: payload.content,
-      senderId: payload.senderId,
-      createdAt: new Date().toISOString(),
-    });
-    return { event: 'sent', matchId: payload.matchId };
+  /** Kept for backwards compatibility; identity comes from the token, not the payload. */
+  @SubscribeMessage('join:user')
+  handleJoinUser(client: AuthedSocket) {
+    if (!client.userId) return { event: 'error' };
+    return { event: 'joined:user', userId: client.userId };
   }
 
+  /** True only when the socket has already been admitted to the match room. */
+  private inMatch(client: AuthedSocket, matchId: string): boolean {
+    return typeof matchId === 'string' && client.rooms.has(`match:${matchId}`);
+  }
+
+  // Note: the old 'message:send' handler was removed. It broadcast a
+  // caller-supplied senderId without persisting anything, so any client could
+  // forge a message from any user. Sending now goes through the REST route,
+  // which authenticates, persists, and emits.
+
+  // ── Typing ────────────────────────────────────────────
+
   @SubscribeMessage('typing:start')
-  handleTypingStart(client: Socket, payload: { matchId: string; userId: string }) {
-    client.to(`match:${payload.matchId}`).emit('typing:start', { userId: payload.userId });
+  handleTypingStart(client: AuthedSocket, payload: { matchId: string }) {
+    if (!client.userId || !this.inMatch(client, payload?.matchId)) return;
+    client.to(`match:${payload.matchId}`).emit('typing:start', { userId: client.userId });
   }
 
   @SubscribeMessage('typing:stop')
-  handleTypingStop(client: Socket, payload: { matchId: string; userId: string }) {
-    client.to(`match:${payload.matchId}`).emit('typing:stop', { userId: payload.userId });
+  handleTypingStop(client: AuthedSocket, payload: { matchId: string }) {
+    if (!client.userId || !this.inMatch(client, payload?.matchId)) return;
+    client.to(`match:${payload.matchId}`).emit('typing:stop', { userId: client.userId });
   }
 
   // ── WebRTC signaling ──────────────────────────────────
 
   @SubscribeMessage('call:offer')
-  handleCallOffer(client: Socket, payload: { matchId: string; offer: RTCSessionDescriptionInit; callerId: string }) {
-    client.to(`match:${payload.matchId}`).emit('call:offer', payload);
+  handleCallOffer(client: AuthedSocket, payload: { matchId: string; offer: RTCSessionDescriptionInit }) {
+    if (!this.inMatch(client, payload?.matchId)) return;
+    client.to(`match:${payload.matchId}`).emit('call:offer', { ...payload, callerId: client.userId });
   }
 
   @SubscribeMessage('call:answer')
-  handleCallAnswer(client: Socket, payload: { matchId: string; answer: RTCSessionDescriptionInit }) {
+  handleCallAnswer(client: AuthedSocket, payload: { matchId: string; answer: RTCSessionDescriptionInit }) {
+    if (!this.inMatch(client, payload?.matchId)) return;
     client.to(`match:${payload.matchId}`).emit('call:answer', payload);
   }
 
   @SubscribeMessage('call:ice')
-  handleCallIce(client: Socket, payload: { matchId: string; candidate: RTCIceCandidateInit }) {
+  handleCallIce(client: AuthedSocket, payload: { matchId: string; candidate: RTCIceCandidateInit }) {
+    if (!this.inMatch(client, payload?.matchId)) return;
     client.to(`match:${payload.matchId}`).emit('call:ice', payload);
   }
 
   @SubscribeMessage('call:end')
-  handleCallEnd(client: Socket, payload: { matchId: string }) {
+  handleCallEnd(client: AuthedSocket, payload: { matchId: string }) {
+    if (!this.inMatch(client, payload?.matchId)) return;
     client.to(`match:${payload.matchId}`).emit('call:end', {});
   }
 }
