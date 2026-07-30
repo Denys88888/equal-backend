@@ -20,6 +20,11 @@ services:
         value: 3000
       - key: NPM_CONFIG_CACHE
         value: /tmp/npm-cache
+      # Comma-separated Pi usernames granted the admin panel, matched
+      # case-insensitively. Authoritative while set: removing a name here
+      # demotes that account on its next login.
+      - key: ADMIN_PI_USERNAMES
+        value: Cherry19899
       - key: PI_API_KEY
         value: h1p5wbaq0kgnnyhhpir0ngt0ozvltsifveghqfpwmxxnbau1fju0kajg0u6ferap
     healthCheckPath: /v1/health

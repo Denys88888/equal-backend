@@ -15,6 +15,34 @@ export class AuthService {
     return { access_token };
   }
 
+  /**
+   * Nothing in the app could ever set Role.ADMIN: piLogin created everyone as
+   * USER, the seed granted nothing and no endpoint promoted anyone — so the
+   * admin panel was unreachable for every account, including the developer's.
+   *
+   * ADMIN_PI_USERNAMES is a comma-separated allowlist of Pi usernames, matched
+   * case-insensitively (the real account is "Cherry19899" with a capital C, and
+   * a lowercase-only comparison has bitten this project before). It is the
+   * source of truth while set: names on it are promoted, admins missing from it
+   * are demoted, so revoking access means editing the env var. When the variable
+   * is unset or empty, roles are left completely untouched.
+   */
+  private async syncAdminRole(user: { id: string; role: string }, piUsername: string) {
+    const allow = (process.env.ADMIN_PI_USERNAMES ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (allow.length === 0) return user as never;
+
+    const desired = allow.includes(piUsername.trim().toLowerCase()) ? 'ADMIN' : 'USER';
+    if (user.role === desired) return user as never;
+
+    return (await this.prisma.user.update({
+      where: { id: user.id },
+      data: { role: desired as 'ADMIN' | 'USER' },
+    })) as never;
+  }
+
   async piLogin(accessToken: string) {
     let piRes: Response;
     try {
@@ -44,6 +72,8 @@ export class AuthService {
         },
       });
     }
+
+    user = await this.syncAdminRole(user, piUser.username);
 
     const access_token = this.jwt.sign({ sub: user.id, piUid: user.piUid, role: user.role });
     return {
