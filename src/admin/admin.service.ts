@@ -165,11 +165,31 @@ export class AdminService {
   }
 
   async getReports() {
-    return this.prisma.report.findMany({
-      include: { reporter: { select: { name: true } } },
+    const reports = await this.prisma.report.findMany({
+      include: {
+        reporter: { select: { name: true, photos: { where: { isMain: true }, take: 1 } } },
+        // Without this the admin UI showed a blank "reported user" — there was no
+        // target relation, so moderators could not see who a report was about.
+        target: { select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+    const STATUS_LABEL: Record<string, string> = {
+      PENDING: 'Pending',
+      RESOLVED: 'Resolved',
+      DISMISSED: 'Resolved',
+    };
+    return reports.map((r) => ({
+      id: r.id,
+      reportedUser: { name: r.target.name, avatar: r.target.photos[0]?.url ?? '' },
+      reporter: { name: r.reporter.name, avatar: r.reporter.photos[0]?.url ?? '' },
+      targetId: r.targetId,
+      reason: r.reason,
+      details: r.description ?? '',
+      status: STATUS_LABEL[r.status] ?? 'Pending',
+      timestamp: r.createdAt,
+    }));
   }
 
   async updateReport(id: string, status: string) {

@@ -27,9 +27,9 @@ export class PaymentsController {
   @ApiBearerAuth()
   async createPayment(
     @Request() req: { user: { id: string } },
-    @Body() body: { amount: number; memo: string; matchId?: string },
+    @Body() body: { amount: number; memo: string; matchId?: string; eventId?: string },
   ) {
-    return this.paymentsService.create(req.user.id, body.amount, body.memo, body.matchId);
+    return this.paymentsService.create(req.user.id, body.amount, body.memo, body.matchId, body.eventId);
   }
 
   @Post(':paymentId/approve')

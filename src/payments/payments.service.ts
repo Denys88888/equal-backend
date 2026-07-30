@@ -28,10 +28,10 @@ export class PaymentsService {
     });
   }
 
-  async create(userId: string, amount: number, memo: string, matchId?: string) {
+  async create(userId: string, amount: number, memo: string, matchId?: string, eventId?: string) {
     if (!amount || amount <= 0) throw new BadRequestException('Amount must be positive');
     return this.prisma.payment.create({
-      data: { userId, amount, memo, matchId, status: 'PENDING' },
+      data: { userId, amount, memo, matchId, eventId, status: 'PENDING' },
     });
   }
 

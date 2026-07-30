@@ -126,6 +126,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'joined:user', userId: client.userId };
   }
 
+  @SubscribeMessage('join:club')
+  async handleJoinClub(client: AuthedSocket, clubId: string) {
+    if (!client.userId || typeof clubId !== 'string') return { event: 'error' };
+    // Only actual members receive club chat
+    const member = await this.prisma.clubMember.findUnique({
+      where: { clubId_userId: { clubId, userId: client.userId } },
+      select: { id: true },
+    });
+    if (!member) return { event: 'error', reason: 'not a member' };
+    client.join(`club:${clubId}`);
+    return { event: 'joined:club', clubId };
+  }
+
+  @SubscribeMessage('leave:club')
+  handleLeaveClub(client: AuthedSocket, clubId: string) {
+    if (typeof clubId === 'string') client.leave(`club:${clubId}`);
+  }
+
   /** True only when the socket has already been admitted to the match room. */
   private inMatch(client: AuthedSocket, matchId: string): boolean {
     return typeof matchId === 'string' && client.rooms.has(`match:${matchId}`);

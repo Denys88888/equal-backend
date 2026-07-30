@@ -38,6 +38,9 @@ model User {
   clubPosts ClubPost[]
   sparkEarns SparkEarn[]
   verificationRequests VerificationRequest[]
+  clubPostLikes ClubPostLike[]
+  clubMessages ClubMessage[]
+  reportsAgainst Report[] @relation("ReportTarget")
 }
 
 model Profile {
@@ -113,6 +116,7 @@ model Club {
 
   members     ClubMember[]
   posts       ClubPost[]
+  messages    ClubMessage[]
 }
 
 model ClubMember {
@@ -137,6 +141,32 @@ model ClubPost {
 
   club     Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
   author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    ClubPostLike[]
+}
+
+model ClubPostLike {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+  createdAt DateTime @default(now())
+
+  post   ClubPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model ClubMessage {
+  id       String @id @default(cuid())
+  clubId   String
+  authorId String
+  content  String
+  createdAt DateTime @default(now())
+
+  club     Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([clubId, createdAt])
 }
 
 
@@ -226,6 +256,7 @@ model Report {
   createdAt   DateTime @default(now())
 
   reporter    User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  target      User @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -268,6 +299,7 @@ model Payment {
   status     PaymentStatus @default(PENDING)
   txid       String?
   matchId    String?
+  eventId    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
