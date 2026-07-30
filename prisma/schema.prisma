@@ -19,6 +19,7 @@ model User {
   verified  Boolean  @default(false)
   isActive  Boolean  @default(true)
   trustScore Int     @default(50)
+  badges    String[]
   sparkBalance Int   @default(0)
   pushSubscription Json?
   createdAt DateTime @default(now())
