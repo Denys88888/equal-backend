@@ -48,6 +48,24 @@ export class UploadService {
     return this.saveLocal(file);
   }
 
+  /**
+   * Verification media (a short selfie video or still). Kept in a private-ish
+   * folder — it is only ever shown to admins during review, never on a profile.
+   */
+  async uploadVerificationMedia(file: Express.Multer.File, userId: string): Promise<string> {
+    if (this.useCloudinary) {
+      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: `equal/${userId}/verification`, resource_type: 'auto' },
+          (err, res) => { if (err || !res) reject(err); else resolve(res); },
+        );
+        uploadStream.end(file.buffer);
+      });
+      return result.secure_url;
+    }
+    return this.saveLocal(file);
+  }
+
   /** Fallback: save to local /uploads (development / Render without Cloudinary) */
   private saveLocal(file: Express.Multer.File): string {
     const uploadsDir = path.join(process.cwd(), 'uploads');

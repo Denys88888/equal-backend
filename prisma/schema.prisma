@@ -37,6 +37,7 @@ model User {
   payments  Payment[]
   clubPosts ClubPost[]
   sparkEarns SparkEarn[]
+  verificationRequests VerificationRequest[]
 }
 
 model Profile {
@@ -167,6 +168,26 @@ model EventRsvp {
   user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, userId])
+}
+
+model VerificationRequest {
+  id        String @id @default(cuid())
+  userId    String
+  mediaUrl  String
+  gesture   String
+  status    VerificationStatus @default(PENDING)
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model SparkEarn {

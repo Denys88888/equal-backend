@@ -12,6 +12,7 @@ import { EventsModule } from './events/events.module';
 import { SparksModule } from './sparks/sparks.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
+import { VerificationModule } from './verification/verification.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -29,6 +30,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SparksModule,
     PaymentsModule,
     AdminModule,
+    VerificationModule,
     GatewayModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerProxyGuard }],
