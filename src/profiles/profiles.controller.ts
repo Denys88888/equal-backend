@@ -43,4 +43,9 @@ export class ProfilesController {
   ) {
     return this.profilesService.swipe(req.user.id, body.targetUserId, body.action);
   }
+
+  @Post('swipe/undo')
+  async undoSwipe(@Request() req: { user: { id: string } }) {
+    return this.profilesService.undoLastSwipe(req.user.id);
+  }
 }

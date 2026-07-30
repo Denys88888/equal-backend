@@ -216,6 +216,54 @@ export class ProfilesService {
       create: { userId, targetId: targetUserId, action },
     });
 
+    return this.resolveMatch(userId, targetUserId, action, sparkBalance);
+  }
+
+  /**
+   * Undo the most recent swipe. Refunds a spark if that swipe spent one, and
+   * removes any match the swipe created so the pair can be shown again.
+   */
+  async undoLastSwipe(userId: string) {
+    const last = await this.prisma.swipeAction.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!last) throw new BadRequestException('Nothing to undo');
+    if (last.action === 'block') throw new BadRequestException('Cannot undo a block');
+
+    // If the swipe produced a match that has since been talked in, undoing would
+    // cascade-delete the whole conversation — for both people. Refuse instead.
+    const [u1, u2] = [userId, last.targetId].sort();
+    const match = await this.prisma.match.findFirst({
+      where: { user1Id: u1, user2Id: u2 },
+      select: { id: true, _count: { select: { messages: true } } },
+    });
+    if (match && match._count.messages > 0) {
+      throw new BadRequestException('Cannot undo — this match already has messages');
+    }
+
+    await this.prisma.swipeAction.delete({ where: { id: last.id } });
+    if (match) await this.prisma.match.delete({ where: { id: match.id } });
+
+    let sparkBalance: number | undefined;
+    if (last.action === 'spark') {
+      const refunded = await this.prisma.user.update({
+        where: { id: userId },
+        data: { sparkBalance: { increment: 1 } },
+        select: { sparkBalance: true },
+      });
+      sparkBalance = refunded.sparkBalance;
+    }
+
+    return { success: true, targetId: last.targetId, sparkBalance };
+  }
+
+  private async resolveMatch(
+    userId: string,
+    targetUserId: string,
+    action: string,
+    sparkBalance?: number,
+  ) {
     if (action === 'like' || action === 'spark') {
       const theyLikedUs = await this.prisma.swipeAction.findFirst({
         where: { userId: targetUserId, targetId: userId, action: { in: ['like', 'spark'] } },
