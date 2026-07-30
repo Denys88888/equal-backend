@@ -82,12 +82,42 @@ export class UsersService {
   }
 
   async blockUser(userId: string, targetId: string) {
+    if (userId === targetId) throw new ForbiddenException('Cannot block yourself');
     await this.prisma.swipeAction.upsert({
       where: { userId_targetId: { userId, targetId } },
       update: { action: 'block' },
       create: { userId, targetId, action: 'block' },
     });
     return { success: true };
+  }
+
+  /**
+   * Blocks are stored as SwipeAction rows with action='block'. Removing the row
+   * both unblocks and puts the person back in the deck.
+   */
+  async unblockUser(userId: string, targetId: string) {
+    await this.prisma.swipeAction.deleteMany({
+      where: { userId, targetId, action: 'block' },
+    });
+    return { success: true };
+  }
+
+  /** The Settings screen previously showed a hardcoded list of two fake people. */
+  async getBlockedUsers(userId: string) {
+    const blocks = await this.prisma.swipeAction.findMany({
+      where: { userId, action: 'block' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (blocks.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: blocks.map((b) => b.targetId) } },
+      select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      avatar: u.photos[0]?.url ?? '',
+    }));
   }
 
   async reportUser(userId: string, targetId: string, reason: string, description?: string) {

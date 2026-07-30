@@ -68,12 +68,26 @@ export class UsersController {
     return this.usersService.deleteUser(req.user.id);
   }
 
+  // Declared before ':id/block' so "blocked" isn't swallowed as an :id param
+  @Get('me/blocked')
+  async getBlocked(@Request() req: { user: { id: string } }) {
+    return this.usersService.getBlockedUsers(req.user.id);
+  }
+
   @Post(':id/block')
   async blockUser(
     @Request() req: { user: { id: string } },
     @Param('id') targetId: string,
   ) {
     return this.usersService.blockUser(req.user.id, targetId);
+  }
+
+  @Delete(':id/block')
+  async unblockUser(
+    @Request() req: { user: { id: string } },
+    @Param('id') targetId: string,
+  ) {
+    return this.usersService.unblockUser(req.user.id, targetId);
   }
 
   @Post(':id/report')
