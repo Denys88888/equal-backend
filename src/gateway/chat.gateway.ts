@@ -37,14 +37,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
     try {
-      const payload = await this.jwt.verifyAsync(token, { secret: process.env.JWT_SECRET });
+      // No explicit secret: use JwtModule's registered options, which are the
+      // same ones used to sign. Passing it separately invites a silent mismatch
+      // that would disconnect every client and kill all realtime.
+      const payload = await this.jwt.verifyAsync(token);
       const userId = payload?.sub ?? payload?.id ?? payload?.userId;
-      if (!userId) throw new Error('no subject in token');
+      if (!userId) throw new Error('token has no subject');
       client.userId = userId;
       // Own room, so the server can always reach this user without trusting input
       client.join(`user:${userId}`);
       this.markOnline(userId);
-    } catch {
+    } catch (e) {
+      // Logged (without the token) so a broken handshake is diagnosable from
+      // Render logs rather than looking like "realtime just stopped working".
+      console.warn(`socket auth rejected: ${(e as Error).message}`);
       client.disconnect(true);
     }
   }
