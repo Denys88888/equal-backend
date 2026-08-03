@@ -6,13 +6,59 @@ export class AdminService {
   constructor(private prisma: PrismaService) {}
 
   async getStats() {
-    const [totalUsers, activeToday, totalMatches, pendingReports] = await Promise.all([
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [
+      totalUsers, activeToday, totalMatches, pendingReports,
+      revenueAll, revenueToday, giftRevenue, ticketRevenue,
+    ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { updatedAt: { gte: new Date(Date.now() - 86400000) } } }),
       this.prisma.match.count(),
       this.prisma.report.count({ where: { status: 'PENDING' } }),
+      // Every payment in this app (gifts, event tickets) goes to the app's own
+      // Pi wallet — there is no A2U payout and no commission split, so
+      // "revenue" is simply every COMPLETED payment. See create() in
+      // payments.service.ts: createPayment() is called with no recipient.
+      this.prisma.payment.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true }, _count: true }),
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: startOfDay } },
+        _sum: { amount: true }, _count: true,
+      }),
+      // memo is our own string ("Gift: X to Y" / "Ticket: EventTitle") set in
+      // usePiPayment call sites — safe to split on since we control the format.
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', memo: { startsWith: 'Gift:' } },
+        _sum: { amount: true }, _count: true,
+      }),
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED', memo: { startsWith: 'Ticket:' } },
+        _sum: { amount: true }, _count: true,
+      }),
     ]);
-    return { totalUsers, activeToday, totalMatches, pendingReports };
+
+    return {
+      totalUsers, activeToday, totalMatches, pendingReports,
+      revenueTotalPi: revenueAll._sum.amount ?? 0,
+      revenueTotalCount: revenueAll._count,
+      revenueTodayPi: revenueToday._sum.amount ?? 0,
+      revenueTodayCount: revenueToday._count,
+      giftRevenuePi: giftRevenue._sum.amount ?? 0,
+      giftRevenueCount: giftRevenue._count,
+      ticketRevenuePi: ticketRevenue._sum.amount ?? 0,
+      ticketRevenueCount: ticketRevenue._count,
+    };
+  }
+
+  /** Raw completed-payment ledger for the admin revenue screen. */
+  async getRevenueHistory() {
+    return this.prisma.payment.findMany({
+      where: { status: 'COMPLETED' },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: { user: { select: { name: true, username: true } } },
+    });
   }
 
   async getUsers() {

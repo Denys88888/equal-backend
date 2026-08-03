@@ -20,6 +20,12 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
+  @Get('revenue')
+  async getRevenueHistory(@Request() req: { user: { role?: string } }) {
+    this.checkAdmin(req);
+    return this.adminService.getRevenueHistory();
+  }
+
   @Get('users')
   async getUsers(@Request() req: { user: { role?: string } }) {
     this.checkAdmin(req);
