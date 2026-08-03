@@ -5,9 +5,11 @@ const prisma = new PrismaClient();
 /**
  * Pilot profiles for the Warsaw launch market.
  * These are explicitly disclosed in `bio` as Equal team pilot accounts —
- * not real people, no scraped/stock photos of real faces (avoids
- * impersonation and reverse-image-search exposure). Avatars are
- * generated SVG gradient+initial, matching the app's own fallback style.
+ * not real people. Avatars are generated flat-illustration busts (hair style +
+ * skin tone + background vary per profile), not photos: deliberately not
+ * photorealistic, so nobody could mistake a pilot card for a real match, and
+ * there's no real person's likeness involved (no impersonation, nothing a
+ * reverse-image search could expose as stolen).
  */
 
 const GRADIENT_PAIRS: [string, string][] = [
@@ -18,9 +20,68 @@ const GRADIENT_PAIRS: [string, string][] = [
   ['#BB83C9', '#F0B84A'],
 ];
 
+const SKIN_TONES = ['#F2C9A0', '#E8B48A', '#C68863', '#8D5A3B', '#6B4028'];
+
+const HAIR_COLORS = ['#2B1B12', '#4A2E1E', '#7A4A2B', '#B87333', '#1C1C1E', '#D9A441'];
+
+/** Hair silhouettes, drawn behind + around the head oval. Purely illustrative shapes. */
+const HAIR_STYLES: ((hx: number, hy: number, hr: number, color: string) => string)[] = [
+  // Long straight, past shoulders
+  (hx, hy, hr, c) => `
+    <path d="M ${hx - hr - 6} ${hy - hr * 0.2} Q ${hx - hr - 14} ${hy + hr * 2.6} ${hx - hr * 0.4} ${hy + hr * 2.8}
+             L ${hx - hr * 0.4} ${hy + hr * 0.6} Q ${hx - hr * 0.4} ${hy - hr * 1.15} ${hx} ${hy - hr * 1.2}
+             Q ${hx + hr * 0.4} ${hy - hr * 1.15} ${hx + hr * 0.4} ${hy + hr * 0.6}
+             L ${hx + hr * 0.4} ${hy + hr * 2.8} Q ${hx + hr + 14} ${hy + hr * 2.6} ${hx + hr + 6} ${hy - hr * 0.2}
+             Q ${hx} ${hy - hr * 1.55} ${hx - hr - 6} ${hy - hr * 0.2} Z" fill="${c}"/>`,
+  // Shoulder-length bob with inward curl
+  (hx, hy, hr, c) => `
+    <path d="M ${hx - hr - 4} ${hy - hr * 0.1} Q ${hx - hr - 10} ${hy + hr * 1.5} ${hx - hr * 0.55} ${hy + hr * 1.35}
+             Q ${hx - hr * 0.55} ${hy - hr * 1.2} ${hx} ${hy - hr * 1.25}
+             Q ${hx + hr * 0.55} ${hy - hr * 1.2} ${hx + hr * 0.55} ${hy + hr * 1.35}
+             Q ${hx + hr + 10} ${hy + hr * 1.5} ${hx + hr + 4} ${hy - hr * 0.1}
+             Q ${hx} ${hy - hr * 1.6} ${hx - hr - 4} ${hy - hr * 0.1} Z" fill="${c}"/>`,
+  // High ponytail
+  (hx, hy, hr, c) => `
+    <path d="M ${hx - hr - 2} ${hy - hr * 0.05} Q ${hx - hr - 6} ${hy + hr * 0.9} ${hx - hr * 0.6} ${hy + hr * 0.85}
+             Q ${hx - hr * 0.6} ${hy - hr * 1.2} ${hx} ${hy - hr * 1.25}
+             Q ${hx + hr * 0.6} ${hy - hr * 1.2} ${hx + hr * 0.6} ${hy + hr * 0.85}
+             Q ${hx + hr + 6} ${hy + hr * 0.9} ${hx + hr + 2} ${hy - hr * 0.05}
+             Q ${hx} ${hy - hr * 1.55} ${hx - hr - 2} ${hy - hr * 0.05} Z" fill="${c}"/>
+    <path d="M ${hx + hr * 0.55} ${hy - hr * 0.85} Q ${hx + hr * 1.7} ${hy - hr * 0.5} ${hx + hr * 1.5} ${hy + hr * 1.4}
+             Q ${hx + hr * 1.15} ${hy + hr * 0.6} ${hx + hr * 0.55} ${hy - hr * 0.85} Z" fill="${c}"/>`,
+  // Curly, wide silhouette
+  (hx, hy, hr, c) => `
+    <path d="M ${hx - hr - 16} ${hy - hr * 0.1}
+             Q ${hx - hr - 20} ${hy + hr * 0.7} ${hx - hr - 4} ${hy + hr * 1.6}
+             Q ${hx - hr * 0.5} ${hy + hr * 1.35} ${hx - hr * 0.5} ${hy - hr * 1.2}
+             Q ${hx} ${hy - hr * 1.5} ${hx + hr * 0.5} ${hy - hr * 1.2}
+             Q ${hx + hr * 0.5} ${hy + hr * 1.35} ${hx + hr + 4} ${hy + hr * 1.6}
+             Q ${hx + hr + 20} ${hy + hr * 0.7} ${hx + hr + 16} ${hy - hr * 0.1}
+             Q ${hx} ${hy - hr * 1.75} ${hx - hr - 16} ${hy - hr * 0.1} Z" fill="${c}"/>`,
+  // Short pixie with side-swept fringe
+  (hx, hy, hr, c) => `
+    <path d="M ${hx - hr - 2} ${hy + hr * 0.1} Q ${hx - hr - 8} ${hy - hr * 0.55} ${hx - hr * 0.5} ${hy - hr * 0.55}
+             Q ${hx - hr * 0.2} ${hy - hr * 1.35} ${hx + hr * 0.35} ${hy - hr * 1.2}
+             Q ${hx + hr * 0.9} ${hy - hr * 1.05} ${hx + hr * 0.6} ${hy - hr * 0.5}
+             Q ${hx + hr + 6} ${hy - hr * 0.3} ${hx + hr + 2} ${hy + hr * 0.15}
+             Q ${hx} ${hy - hr * 1.05} ${hx - hr - 2} ${hy + hr * 0.1} Z" fill="${c}"/>`,
+];
+
+/**
+ * A flat-illustration bust portrait: gradient background, oval head + neck +
+ * shoulders in a skin tone, a hair silhouette, and minimal facial marks (eyes,
+ * a soft smile). Deterministic per name so re-seeding doesn't reshuffle looks.
+ */
 function makeAvatar(name: string, seed: number): string {
   const [c1, c2] = GRADIENT_PAIRS[seed % GRADIENT_PAIRS.length];
-  const initial = name.charAt(0).toUpperCase();
+  const skin = SKIN_TONES[seed % SKIN_TONES.length];
+  const hairColor = HAIR_COLORS[(seed + 2) % HAIR_COLORS.length];
+  const hairStyle = HAIR_STYLES[seed % HAIR_STYLES.length];
+
+  const hx = 200; // head center x
+  const hy = 250; // head center y
+  const hr = 78;  // head radius
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
     <defs>
       <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
@@ -29,7 +90,22 @@ function makeAvatar(name: string, seed: number): string {
       </linearGradient>
     </defs>
     <rect width="400" height="600" fill="url(#g)"/>
-    <text x="200" y="330" font-family="'Outfit', system-ui, sans-serif" font-size="180" font-weight="700" fill="rgba(255,255,255,0.9)" text-anchor="middle">${initial}</text>
+    <!-- shoulders / top -->
+    <path d="M 60 600 Q 60 430 200 430 Q 340 430 340 600 Z" fill="rgba(255,255,255,0.85)"/>
+    <!-- neck -->
+    <rect x="${hx - 24}" y="${hy + hr - 20}" width="48" height="60" fill="${skin}"/>
+    <!-- hair (back layer) -->
+    ${hairStyle(hx, hy, hr, hairColor)}
+    <!-- head -->
+    <circle cx="${hx}" cy="${hy}" r="${hr}" fill="${skin}"/>
+    <!-- eyes -->
+    <ellipse cx="${hx - 26}" cy="${hy + 4}" rx="7" ry="9" fill="#2B1B12"/>
+    <ellipse cx="${hx + 26}" cy="${hy + 4}" rx="7" ry="9" fill="#2B1B12"/>
+    <!-- smile -->
+    <path d="M ${hx - 22} ${hy + 34} Q ${hx} ${hy + 50} ${hx + 22} ${hy + 34}" stroke="#8B4A3A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- blush -->
+    <ellipse cx="${hx - 42}" cy="${hy + 22}" rx="10" ry="6" fill="rgba(232,106,106,0.25)"/>
+    <ellipse cx="${hx + 42}" cy="${hy + 22}" rx="10" ry="6" fill="rgba(232,106,106,0.25)"/>
   </svg>`;
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }
@@ -92,7 +168,20 @@ async function main() {
     const username = `${p.name.toLowerCase().replace(/[^a-z]/g, '')}_pilot`;
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
-      console.log(`Skipping ${p.name} — already exists`);
+      // Refresh the avatar in place — these are bot-controlled pilot accounts,
+      // not user-edited profiles, so overwriting their photo on every deploy is
+      // safe and is how a new makeAvatar() style actually reaches accounts that
+      // were already seeded (the rest of this block only runs for brand-new
+      // pilots, so without this an avatar-generator change would silently do
+      // nothing for anyone already in the database).
+      const mainPhoto = await prisma.photo.findFirst({ where: { userId: existing.id, isMain: true } });
+      const newAvatar = makeAvatar(p.name, i);
+      if (mainPhoto) {
+        await prisma.photo.update({ where: { id: mainPhoto.id }, data: { url: newAvatar } });
+      } else {
+        await prisma.photo.create({ data: { userId: existing.id, url: newAvatar, isMain: true, order: 0 } });
+      }
+      console.log(`↻ Refreshed avatar: ${p.name}`);
       i++;
       continue;
     }
