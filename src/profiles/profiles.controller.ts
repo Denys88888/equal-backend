@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, UseGuards, Request, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProfilesService } from './profiles.service';
@@ -47,5 +47,15 @@ export class ProfilesController {
   @Post('swipe/undo')
   async undoSwipe(@Request() req: { user: { id: string } }) {
     return this.profilesService.undoLastSwipe(req.user.id);
+  }
+
+  // Declared last so it never swallows the static routes above ('discover',
+  // 'me', 'swipe') as a :userId value.
+  @Get(':userId')
+  async getPublicProfile(
+    @Request() req: { user: { id: string } },
+    @Param('userId') userId: string,
+  ) {
+    return this.profilesService.getPublicProfile(req.user.id, userId);
   }
 }

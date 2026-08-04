@@ -41,6 +41,15 @@ model User {
   clubPostLikes ClubPostLike[]
   clubMessages ClubMessage[]
   reportsAgainst Report[] @relation("ReportTarget")
+  clubPostComments ClubPostComment[]
+}
+
+// Small admin-editable key/value store — currently just the support email
+// that Settings' Help Center / Report a Problem rows point to.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model Profile {
@@ -137,11 +146,13 @@ model ClubPost {
   clubId   String
   authorId String
   content  String
+  image    String?
   createdAt DateTime @default(now())
 
   club     Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
   author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes    ClubPostLike[]
+  comments ClubPostComment[]
 }
 
 model ClubPostLike {
@@ -154,6 +165,19 @@ model ClubPostLike {
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
+}
+
+model ClubPostComment {
+  id       String @id @default(cuid())
+  postId   String
+  authorId String
+  content  String
+  createdAt DateTime @default(now())
+
+  post     ClubPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
 }
 
 model ClubMessage {

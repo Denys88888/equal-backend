@@ -60,6 +60,29 @@ export class ClubsService {
     if (!member) throw new ForbiddenException('Join the club first');
   }
 
+  /**
+   * Real club roster. The Members tab used to be permanently empty (or "You"
+   * only) — there was no endpoint here at all, so a club's actual membership
+   * was never fetched.
+   */
+  async getMembers(clubId: string, requesterId: string) {
+    await this.assertMember(clubId, requesterId);
+    const members = await this.prisma.clubMember.findMany({
+      where: { clubId },
+      orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+      include: {
+        user: { select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } } },
+      },
+    });
+    return members.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      avatar: m.user.photos[0]?.url ?? '',
+      role: m.role.toLowerCase(),
+      online: this.gateway.isOnline(m.user.id),
+    }));
+  }
+
   async getPosts(clubId: string, userId?: string) {
     const posts = await this.prisma.clubPost.findMany({
       where: { clubId },
@@ -69,7 +92,7 @@ export class ClubsService {
         author: {
           select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } },
         },
-        _count: { select: { likes: true } },
+        _count: { select: { likes: true, comments: true } },
         ...(userId ? { likes: { where: { userId }, select: { id: true } } } : {}),
       },
     });
@@ -80,17 +103,72 @@ export class ClubsService {
       authorName: p.author.name,
       authorAvatar: p.author.photos[0]?.url ?? '',
       content: p.content,
+      image: p.image,
       likes: p._count.likes,
+      comments: p._count.comments,
       likedByMe: userId ? p.likes.length > 0 : false,
       createdAt: p.createdAt,
     }));
   }
 
-  async createPost(clubId: string, authorId: string, content: string) {
+  async createPost(clubId: string, authorId: string, content: string, image?: string) {
     await this.assertMember(clubId, authorId);
+    const trimmed = (content ?? '').trim();
+    if (!trimmed && !image) throw new ForbiddenException('Post needs text or a photo');
     return this.prisma.clubPost.create({
-      data: { clubId, authorId, content },
+      data: { clubId, authorId, content: trimmed, image },
     });
+  }
+
+  // ── Post comments ───────────────────────────────────────
+  // The comment button on a post had no backend behind it either — it just
+  // displayed a static count with nothing to open.
+
+  async getComments(postId: string, userId: string) {
+    const post = await this.prisma.clubPost.findUnique({ where: { id: postId }, select: { clubId: true } });
+    if (!post) throw new NotFoundException('Post not found');
+    await this.assertMember(post.clubId, userId);
+
+    const comments = await this.prisma.clubPostComment.findMany({
+      where: { postId },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      include: {
+        author: { select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } } },
+      },
+    });
+    return comments.map((c) => ({
+      id: c.id,
+      postId: c.postId,
+      authorId: c.authorId,
+      authorName: c.author.name,
+      authorAvatar: c.author.photos[0]?.url ?? '',
+      content: c.content,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  async createComment(postId: string, authorId: string, content: string) {
+    const post = await this.prisma.clubPost.findUnique({ where: { id: postId }, select: { clubId: true } });
+    if (!post) throw new NotFoundException('Post not found');
+    await this.assertMember(post.clubId, authorId);
+
+    const trimmed = (content ?? '').trim();
+    if (!trimmed) throw new ForbiddenException('Comment cannot be empty');
+
+    const comment = await this.prisma.clubPostComment.create({
+      data: { postId, authorId, content: trimmed },
+      include: { author: { select: { id: true, name: true, photos: { where: { isMain: true }, take: 1 } } } },
+    });
+    return {
+      id: comment.id,
+      postId,
+      authorId,
+      authorName: comment.author.name,
+      authorAvatar: comment.author.photos[0]?.url ?? '',
+      content: comment.content,
+      createdAt: comment.createdAt,
+    };
   }
 
   /** Toggles this user's like. Returns the resulting count and state. */

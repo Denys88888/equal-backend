@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { PushService } from '../users/push.service';
@@ -142,6 +142,64 @@ export class ProfilesService {
         isNew: false,
       };
     });
+  }
+
+  /**
+   * A single public profile — for the club "Meet [author/member]" buttons,
+   * which had nowhere to send the user: no screen anywhere in the app could
+   * show another person's profile except your own swipe deck.
+   */
+  async getPublicProfile(viewerId: string, targetId: string) {
+    if (viewerId === targetId) throw new BadRequestException('Cannot view your own profile this way');
+
+    const blocked = await this.prisma.swipeAction.findFirst({
+      where: {
+        action: 'block',
+        OR: [
+          { userId: viewerId, targetId },
+          { userId: targetId, targetId: viewerId },
+        ],
+      },
+    });
+    if (blocked) throw new NotFoundException('Profile not found');
+
+    const [target, myProfile, myMatches, myLike] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: targetId, isActive: true },
+        include: { profile: true, photos: { orderBy: { order: 'asc' } } },
+      }),
+      this.prisma.profile.findUnique({ where: { userId: viewerId }, select: { interests: true } }),
+      this.prisma.match.findFirst({
+        where: { OR: [{ user1Id: viewerId, user2Id: targetId }, { user1Id: targetId, user2Id: viewerId }] },
+        select: { id: true },
+      }),
+      this.prisma.swipeAction.findUnique({ where: { userId_targetId: { userId: viewerId, targetId } } }),
+    ]);
+    if (!target) throw new NotFoundException('Profile not found');
+
+    const myInterests = new Set(myProfile?.interests ?? []);
+    const theirInterests: string[] = target.profile?.interests ?? [];
+    const intersection = theirInterests.filter((i) => myInterests.has(i)).length;
+    const union = new Set([...myInterests, ...theirInterests]).size;
+    const compatibility = union > 0 ? Math.round((intersection / union) * 100) : 50;
+
+    return {
+      id: target.id,
+      name: target.name,
+      age: target.profile?.birthDate
+        ? Math.floor((Date.now() - new Date(target.profile.birthDate).getTime()) / 31536000000)
+        : null,
+      compatibility,
+      photo: target.photos[0]?.url || '',
+      photos: target.photos.map((p) => p.url),
+      bio: target.profile?.bio || '',
+      interests: theirInterests,
+      verified: target.verified ?? false,
+      activeNow: this.gateway.isOnline(target.id),
+      isMatch: !!myMatches,
+      matchId: myMatches?.id ?? null,
+      alreadyLiked: myLike ? ['like', 'spark'].includes(myLike.action) : false,
+    };
   }
 
   async updateProfile(userId: string, data: Record<string, unknown>) {
