@@ -73,7 +73,19 @@ export class UsersService {
   async deletePhoto(userId: string, photoId: string) {
     const photo = await this.prisma.photo.findUnique({ where: { id: photoId } });
     if (!photo || photo.userId !== userId) throw new NotFoundException('Photo not found');
-    return this.prisma.photo.delete({ where: { id: photoId } });
+    await this.prisma.photo.delete({ where: { id: photoId } });
+
+    // If the deleted photo was the main one, promote the next by display order —
+    // otherwise chat/club avatars (which key off Photo.isMain, not position)
+    // go blank even though Discover's photos[0]-by-order would show someone else.
+    if (photo.isMain) {
+      const next = await this.prisma.photo.findFirst({
+        where: { userId },
+        orderBy: { order: 'asc' },
+      });
+      if (next) await this.prisma.photo.update({ where: { id: next.id }, data: { isMain: true } });
+    }
+    return { success: true };
   }
 
   async deleteUser(id: string) {

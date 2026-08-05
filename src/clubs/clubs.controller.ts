@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param, Query, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, UseGuards, Request, Param, Query, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -72,6 +72,22 @@ export class ClubsController {
       imageUrl = await this.uploadService.uploadPhoto(file, req.user.id);
     }
     return this.clubsService.createPost(clubId, req.user.id, body.content, imageUrl);
+  }
+
+  @Delete('posts/:postId')
+  async deletePost(
+    @Request() req: { user: { id: string; role?: string } },
+    @Param('postId') postId: string,
+  ) {
+    return this.clubsService.deletePost(postId, req.user.id, req.user.role === 'ADMIN');
+  }
+
+  @Delete('comments/:commentId')
+  async deleteComment(
+    @Request() req: { user: { id: string; role?: string } },
+    @Param('commentId') commentId: string,
+  ) {
+    return this.clubsService.deleteComment(commentId, req.user.id, req.user.role === 'ADMIN');
   }
 
   @Post('posts/:postId/like')

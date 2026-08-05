@@ -171,6 +171,28 @@ export class ClubsService {
     };
   }
 
+  /**
+   * Delete your own post (or, if isAdmin, anyone's). There was no way to
+   * remove a post at all before — not by its author, not by a moderator.
+   * Comments and likes cascade via the schema's onDelete: Cascade.
+   */
+  async deletePost(postId: string, requesterId: string, isAdmin: boolean) {
+    const post = await this.prisma.clubPost.findUnique({ where: { id: postId }, select: { authorId: true } });
+    if (!post) throw new NotFoundException('Post not found');
+    if (post.authorId !== requesterId && !isAdmin) throw new ForbiddenException('Not your post');
+    await this.prisma.clubPost.delete({ where: { id: postId } });
+    return { success: true };
+  }
+
+  /** Delete your own comment (or, if isAdmin, anyone's). */
+  async deleteComment(commentId: string, requesterId: string, isAdmin: boolean) {
+    const comment = await this.prisma.clubPostComment.findUnique({ where: { id: commentId }, select: { authorId: true } });
+    if (!comment) throw new NotFoundException('Comment not found');
+    if (comment.authorId !== requesterId && !isAdmin) throw new ForbiddenException('Not your comment');
+    await this.prisma.clubPostComment.delete({ where: { id: commentId } });
+    return { success: true };
+  }
+
   /** Toggles this user's like. Returns the resulting count and state. */
   async toggleLike(postId: string, userId: string) {
     const post = await this.prisma.clubPost.findUnique({
