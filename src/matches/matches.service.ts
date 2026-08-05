@@ -34,6 +34,22 @@ export class MatchesService {
     });
     const unreadMap = Object.fromEntries(unreadRows.map((r) => [r.matchId, r._count.id]));
 
+    // sparkUsed was hardcoded false — the "Super Liked" badge could never show
+    // even when a match genuinely came from a spark swipe. A spark from either
+    // side of the pair counts.
+    const partnerIds = matches.map((m) => (m.user1Id === userId ? m.user2Id : m.user1Id));
+    const sparkRows = await this.prisma.swipeAction.findMany({
+      where: {
+        action: 'spark',
+        OR: [
+          { userId, targetId: { in: partnerIds } },
+          { userId: { in: partnerIds }, targetId: userId },
+        ],
+      },
+      select: { userId: true, targetId: true },
+    });
+    const sparkPairs = new Set(sparkRows.map((s) => [s.userId, s.targetId].sort().join(':')));
+
     return matches.map((match) => {
       const partner = match.user1Id === userId ? match.user2 : match.user1;
       const birthDate = partner.profile?.birthDate;
@@ -59,9 +75,15 @@ export class MatchesService {
         isNew: ageMs < 24 * 60 * 60 * 1000,
         hasConversation: match.messages.length > 0,
         isOnline: this.gateway.isOnline(partner.id),
-        sparkUsed: false,
+        sparkUsed: sparkPairs.has([userId, partner.id].sort().join(':')),
         unreadCount: unreadMap[match.id] ?? 0,
         lastMessage: lastMsg?.content,
+        // The frontend used to guess message type by checking whether
+        // lastMessage's raw text happened to contain "photo"/"voice"/"gift" —
+        // for VOICE/IMAGE, that text is actually a Cloudinary/upload URL, so a
+        // conversation whose last message was a photo would show the raw image
+        // URL in the preview instead of a clean label.
+        lastMessageType: lastMsg?.type,
         lastMessageTime: lastMsg?.createdAt,
         isTyping: false,
       };
