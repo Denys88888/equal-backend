@@ -42,6 +42,7 @@ model User {
   clubMessages ClubMessage[]
   reportsAgainst Report[] @relation("ReportTarget")
   clubPostComments ClubPostComment[]
+  createdClubs Club[] @relation("ClubCreator")
 }
 
 // Small admin-editable key/value store — currently just the support email
@@ -114,6 +115,11 @@ model Message {
   @@index([matchId, createdAt])
 }
 
+enum ClubStatus {
+  PENDING
+  ACTIVE
+}
+
 model Club {
   id          String @id @default(cuid())
   name        String
@@ -121,11 +127,18 @@ model Club {
   category    String
   icon        String?
   memberCount Int @default(0)
+  // Defaults to ACTIVE so existing/seeded clubs aren't retroactively hidden;
+  // the create() service call explicitly sets PENDING for user-submitted clubs.
+  status      ClubStatus @default(ACTIVE)
+  createdBy   String?
   createdAt   DateTime @default(now())
 
+  creator     User? @relation("ClubCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   members     ClubMember[]
   posts       ClubPost[]
   messages    ClubMessage[]
+
+  @@index([status])
 }
 
 model ClubMember {

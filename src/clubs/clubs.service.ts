@@ -22,6 +22,9 @@ export class ClubsService {
 
   async getAll(userId?: string) {
     const clubs = await this.prisma.club.findMany({
+      // Pending clubs are only visible to the member who created them until
+      // an admin approves — everyone else only sees ACTIVE clubs.
+      where: userId ? { OR: [{ status: 'ACTIVE' }, { createdBy: userId }] } : { status: 'ACTIVE' },
       include: {
         _count: { select: { members: true, posts: true } },
         ...(userId ? { members: { where: { userId }, select: { id: true } } } : {}),
@@ -36,12 +39,20 @@ export class ClubsService {
       memberCount: c._count.members,
       postCount: c._count.posts,
       isJoined: userId ? c.members.length > 0 : false,
+      status: c.status,
       createdAt: c.createdAt,
     }));
   }
 
-  async create(data: { name: string; description?: string; category: string }) {
-    return this.prisma.club.create({ data });
+  async create(data: { name: string; description?: string; category: string }, creatorId: string) {
+    const club = await this.prisma.club.create({
+      data: { ...data, createdBy: creatorId, status: 'PENDING' },
+    });
+    // Creator auto-joins their own (pending) club as its admin
+    await this.prisma.clubMember.create({
+      data: { clubId: club.id, userId: creatorId, role: 'ADMIN' },
+    });
+    return club;
   }
 
   async join(clubId: string, userId: string) {

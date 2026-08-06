@@ -131,7 +131,10 @@ export class AdminService {
     const clubs = await this.prisma.club.findMany({
       orderBy: { createdAt: 'desc' },
       take: 100,
-      include: { _count: { select: { members: true, posts: true } } },
+      include: {
+        _count: { select: { members: true, posts: true } },
+        creator: { select: { name: true } },
+      },
     });
     return clubs.map((c) => ({
       id: c.id,
@@ -139,8 +142,17 @@ export class AdminService {
       category: c.category,
       memberCount: c._count.members,
       postCount: c._count.posts,
+      status: c.status,
+      createdBy: c.creator?.name ?? '',
       createdAt: c.createdAt,
     }));
+  }
+
+  async approveClub(clubId: string) {
+    const club = await this.prisma.club.findUnique({ where: { id: clubId }, select: { id: true } });
+    if (!club) throw new NotFoundException('Club not found');
+    await this.prisma.club.update({ where: { id: clubId }, data: { status: 'ACTIVE' } });
+    return { success: true };
   }
 
   async deleteClub(clubId: string) {

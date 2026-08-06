@@ -28,8 +28,11 @@ export class ClubsController {
   }
 
   @Post()
-  async createClub(@Body() body: { name: string; description?: string; category: string }) {
-    return this.clubsService.create(body);
+  async createClub(
+    @Request() req: { user: { id: string } },
+    @Body() body: { name: string; description?: string; category: string },
+  ) {
+    return this.clubsService.create(body, req.user.id);
   }
 
   @Post(':id/join')

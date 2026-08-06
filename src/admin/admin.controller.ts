@@ -103,6 +103,12 @@ export class AdminController {
     return this.adminService.getClubs();
   }
 
+  @Post('clubs/:id/approve')
+  async approveClub(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
+    this.checkAdmin(req);
+    return this.adminService.approveClub(id);
+  }
+
   @Delete('clubs/:id')
   async deleteClub(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
     this.checkAdmin(req);
