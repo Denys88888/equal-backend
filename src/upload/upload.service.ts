@@ -73,6 +73,10 @@ export class UploadService {
     const safeName = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
     const filename = `${Date.now()}-${safeName}`;
     fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
-    return `/uploads/${filename}`;
+    // Must be absolute: the frontend is a separate origin (equal-app.onrender.com),
+    // so a bare "/uploads/..." path resolves against the FRONTEND's origin in an
+    // <img> tag and 404s there — only this backend actually serves /uploads.
+    const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
+    return `${base}/uploads/${filename}`;
   }
 }
