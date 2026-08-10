@@ -173,8 +173,13 @@ export class AdminService {
     return events.map((e) => ({
       id: e.id,
       name: e.title,
+      description: e.description ?? '',
       date: e.date,
       location: e.location ?? '',
+      city: e.city ?? '',
+      category: e.category ?? '',
+      price: e.price,
+      maxAttendees: e.maxAttendees,
       attendees: e._count.rsvps,
       featured: e.featured,
       status: e.date.getTime() > now ? 'Upcoming' : 'Past',
@@ -185,6 +190,31 @@ export class AdminService {
     const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
     if (!event) throw new NotFoundException('Event not found');
     await this.prisma.event.delete({ where: { id: eventId } });
+    return { success: true };
+  }
+
+  async updateEvent(eventId: string, data: {
+    title?: string; description?: string; date?: string; location?: string;
+    city?: string; category?: string; price?: number; maxAttendees?: number;
+  }) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!event) throw new NotFoundException('Event not found');
+    if (data.price !== undefined && data.price < 0) {
+      throw new BadRequestException('Price cannot be negative');
+    }
+    await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.date !== undefined && { date: new Date(data.date) }),
+        ...(data.location !== undefined && { location: data.location }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.price !== undefined && { price: data.price }),
+        ...(data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
+      },
+    });
     return { success: true };
   }
 

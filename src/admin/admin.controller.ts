@@ -127,6 +127,19 @@ export class AdminController {
     return this.adminService.deleteEvent(id);
   }
 
+  @Patch('events/:id')
+  async updateEvent(
+    @Request() req: { user: { role?: string } },
+    @Param('id') id: string,
+    @Body() body: {
+      title?: string; description?: string; date?: string; location?: string;
+      city?: string; category?: string; price?: number; maxAttendees?: number;
+    },
+  ) {
+    this.checkAdmin(req);
+    return this.adminService.updateEvent(id, body);
+  }
+
   @Post('events/:id/feature')
   async featureEvent(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
     this.checkAdmin(req);
