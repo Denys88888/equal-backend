@@ -22,6 +22,21 @@ model User {
   badges    String[]
   sparkBalance Int   @default(0)
   pushSubscription Json?
+
+  // Daily Match: languages drive the shared-language pairing filter; timezone +
+  // dailyMatchTime decide WHEN the cron picks this user up. trustScore doubles
+  // as the spec's "reputation" rather than adding a second overlapping score.
+  languages String[]
+  timezone  String   @default("Europe/Warsaw")
+  dailyMatchTime String @default("15:00")
+  // Set by the 3-strikes auto-ban; checked by BannedGuard on every request.
+  bannedUntil DateTime?
+  // Voice Intro is mandatory — a profile without one is excluded from matching.
+  voiceIntroUrl String?
+  // Vibe Check: reset to null by the 09:00 cron, re-set by the user each day.
+  dailyVibe String?
+  vibeUpdatedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -43,6 +58,91 @@ model User {
   reportsAgainst Report[] @relation("ReportTarget")
   clubPostComments ClubPostComment[]
   createdClubs Club[] @relation("ClubCreator")
+  dailyMatchesA DailyMatch[] @relation("DailyMatchUserA")
+  dailyMatchesB DailyMatch[] @relation("DailyMatchUserB")
+  dailyMatchMessages DailyMatchMessage[]
+  matchLogs MatchLog[]
+  waitingList WaitingList[]
+}
+
+// ── Daily Match ─────────────────────────────────────────
+// Deliberately separate from Match/Message: those power the permanent
+// swipe-based chat. A DailyMatch is a time-boxed 24h conversation that only
+// becomes permanent (MUTUAL) if both sides actually wrote something.
+
+enum DailyMatchStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  MUTUAL
+  REJECTED
+}
+
+model DailyMatch {
+  id        String @id @default(cuid())
+  userAId   String
+  userBId   String
+  matchDate DateTime @default(now())
+  status    DailyMatchStatus @default(PENDING)
+  chatExpiresAt DateTime
+
+  // Icebreaker Roulette lives on the match, not on a side table — one question
+  // per match, both answers hidden until both are in.
+  icebreakerKey String?
+  icebreakerAnswerA String?
+  icebreakerAnswerB String?
+  icebreakerSkippedA Boolean @default(false)
+  icebreakerSkippedB Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  userA     User @relation("DailyMatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User @relation("DailyMatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages  DailyMatchMessage[]
+  logs      MatchLog[]
+
+  @@index([userAId, status])
+  @@index([userBId, status])
+  @@index([status, chatExpiresAt])
+}
+
+model DailyMatchMessage {
+  id       String @id @default(cuid())
+  dailyMatchId String
+  senderId String
+  content  String
+  // TEXT or SYSTEM (Truth or Dare cards are inserted as SYSTEM)
+  kind     String @default("TEXT")
+  createdAt DateTime @default(now())
+
+  dailyMatch DailyMatch @relation(fields: [dailyMatchId], references: [id], onDelete: Cascade)
+  sender     User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([dailyMatchId, createdAt])
+}
+
+model MatchLog {
+  id       String @id @default(cuid())
+  userId   String
+  dailyMatchId String
+  action   String
+  createdAt DateTime @default(now())
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyMatch DailyMatch @relation(fields: [dailyMatchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model WaitingList {
+  id       String @id @default(cuid())
+  userId   String
+  requestedAt DateTime @default(now())
+  processed Boolean @default(false)
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([processed, requestedAt])
 }
 
 // Small admin-editable key/value store — currently just the support email

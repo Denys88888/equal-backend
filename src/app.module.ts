@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerProxyGuard } from './throttler-proxy.guard';
+import { CommonModule } from './common/common.module';
+import { DailyMatchModule } from './daily-match/daily-match.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProfilesModule } from './profiles/profiles.module';
@@ -19,7 +22,10 @@ import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    // 100 requests / 15 min, matching the spec's express-rate-limit budget.
+    ThrottlerModule.forRoot([{ ttl: 15 * 60 * 1000, limit: 100 }]),
+    ScheduleModule.forRoot(),
+    CommonModule,
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -34,6 +40,7 @@ import { PrismaModule } from './prisma/prisma.module';
     VerificationModule,
     SettingsModule,
     GatewayModule,
+    DailyMatchModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerProxyGuard }],
 })

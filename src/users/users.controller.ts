@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, Request, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -37,6 +37,41 @@ export class UsersController {
   @Get('vapid-public-key')
   getVapidPublicKey() {
     return { key: process.env.VAPID_PUBLIC_KEY || '' };
+  }
+
+  /**
+   * Voice Intro — a ~10s audio/webm clip recorded client-side. Required before
+   * a profile is eligible for Daily Match.
+   */
+  @Post('me/voice-intro')
+  @UseInterceptors(FileInterceptor('voice', {
+    storage: memoryStorage(),
+    limits: { fileSize: 3 * 1024 * 1024 },
+  }))
+  async uploadVoiceIntro(
+    @Request() req: { user: { id: string } },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('No audio uploaded');
+    if (!file.mimetype?.startsWith('audio/')) {
+      throw new BadRequestException('File must be audio');
+    }
+    const url = await this.uploadService.uploadAudio(file, req.user.id);
+    return this.usersService.setVoiceIntro(req.user.id, url);
+  }
+
+  @Delete('me/voice-intro')
+  async deleteVoiceIntro(@Request() req: { user: { id: string } }) {
+    return this.usersService.deleteVoiceIntro(req.user.id);
+  }
+
+  /** Daily Match delivery preferences (timezone, local delivery time, languages). */
+  @Patch('me/match-prefs')
+  async updateMatchPrefs(
+    @Request() req: { user: { id: string } },
+    @Body() body: { timezone?: string; dailyMatchTime?: string; languages?: string[] },
+  ) {
+    return this.usersService.updateMatchPrefs(req.user.id, body);
   }
 
   @Post('me/photos')

@@ -119,6 +119,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'joined', matchId };
   }
 
+  /** Daily Match room — same DB-checked membership rule as join:match. */
+  @SubscribeMessage('join:daily')
+  async handleJoinDaily(client: AuthedSocket, dailyMatchId: string) {
+    if (!client.userId || typeof dailyMatchId !== 'string') return { event: 'error' };
+    const match = await this.prisma.dailyMatch.findFirst({
+      where: {
+        id: dailyMatchId,
+        OR: [{ userAId: client.userId }, { userBId: client.userId }],
+      },
+      select: { id: true },
+    });
+    if (!match) return { event: 'error', reason: 'not a participant' };
+    client.join(`daily:${dailyMatchId}`);
+    return { event: 'joined:daily', dailyMatchId };
+  }
+
   /** Kept for backwards compatibility; identity comes from the token, not the payload. */
   @SubscribeMessage('join:user')
   handleJoinUser(client: AuthedSocket) {

@@ -54,6 +54,12 @@ async function bootstrap() {
     res.json({ status: 'ok', ts: Date.now() });
   });
 
+  // Cheap unauthenticated keep-alive target. Deliberately outside the /v1
+  // prefix and free of any DB work, so an external pinger costs nothing.
+  httpAdapter.get('/ping', (_req: unknown, res: { send: (v: string) => void }) => {
+    res.send('pong');
+  });
+
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`API running on port ${port}`);

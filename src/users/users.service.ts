@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const ALLOWED_USER_FIELDS = ['name', 'avatar'];
@@ -132,11 +132,69 @@ export class UsersService {
     }));
   }
 
+  /** Reports that count toward an auto-ban, and how long the ban lasts. */
+  private static readonly AUTOBAN_THRESHOLD = 3;
+  private static readonly AUTOBAN_WINDOW_MS = 24 * 60 * 60 * 1000;
+  private static readonly AUTOBAN_DURATION_MS = 24 * 60 * 60 * 1000;
+
   async reportUser(userId: string, targetId: string, reason: string, description?: string) {
     await this.prisma.report.create({
       data: { reporterId: userId, targetId, reason, description },
     });
+
+    // 3 distinct reporters inside 24h → automatic 24h ban. Counting DISTINCT
+    // reporters (not raw rows) is what stops one person from banning anyone
+    // they dislike by filing the same report three times.
+    const since = new Date(Date.now() - UsersService.AUTOBAN_WINDOW_MS);
+    const recent = await this.prisma.report.findMany({
+      where: { targetId, createdAt: { gte: since } },
+      select: { reporterId: true },
+      distinct: ['reporterId'],
+    });
+
+    if (recent.length >= UsersService.AUTOBAN_THRESHOLD) {
+      await this.prisma.user.update({
+        where: { id: targetId },
+        data: { bannedUntil: new Date(Date.now() + UsersService.AUTOBAN_DURATION_MS) },
+      });
+      return { success: true, autoBanned: true };
+    }
+
+    return { success: true, autoBanned: false };
+  }
+
+  /**
+   * Voice Intro is required before a profile enters matching, so this is a
+   * plain setter on User rather than another Photo-style table.
+   */
+  async setVoiceIntro(userId: string, url: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { voiceIntroUrl: url } });
+    return { voiceIntroUrl: url };
+  }
+
+  async deleteVoiceIntro(userId: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { voiceIntroUrl: null } });
     return { success: true };
+  }
+
+  /** Daily Match delivery preferences (timezone, local time, languages). */
+  async updateMatchPrefs(
+    userId: string,
+    data: { timezone?: string; dailyMatchTime?: string; languages?: string[] },
+  ) {
+    if (data.dailyMatchTime && !/^\d{1,2}:\d{2}$/.test(data.dailyMatchTime)) {
+      throw new BadRequestException('dailyMatchTime must be HH:mm');
+    }
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
+        ...(data.dailyMatchTime !== undefined && { dailyMatchTime: data.dailyMatchTime }),
+        ...(data.languages !== undefined && { languages: data.languages }),
+      },
+      select: { timezone: true, dailyMatchTime: true, languages: true, voiceIntroUrl: true },
+    });
+    return user;
   }
 
   async reorderPhotos(userId: string, photoIds: string[]) {
