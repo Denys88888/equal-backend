@@ -437,6 +437,10 @@ model Payment {
   txid       String?
   matchId    String?
   eventId    String?
+  // Set when a completed payment has been redeemed for the thing it bought
+  // (currently an extra Daily Match). Without this a single payment could be
+  // replayed for unlimited extras.
+  consumedAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

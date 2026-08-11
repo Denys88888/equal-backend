@@ -4,8 +4,10 @@ import { PushService } from '../users/push.service';
 import { ProfanityService } from '../common/profanity.service';
 import { LoggerService } from '../common/logger.service';
 import { ChatGateway } from '../gateway/chat.gateway';
-import { isDue, localDayStart, intersect, genderCompatible } from './daily-match.util';
+import { isDue, localDayStart, intersect, genderCompatible, languageCompatible } from './daily-match.util';
 
+/** Memo the extra-match Pi payment is created with; must match the client. */
+export const EXTRA_MATCH_MEMO = 'Extra Daily Match';
 /** How long a fresh Daily Match conversation stays open. */
 const CHAT_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Pairs are not repeated inside this window. */
@@ -75,7 +77,7 @@ export class DailyMatchService {
         (other) =>
           other.id !== user.id &&
           !paired.has(other.id) &&
-          intersect(user.languages, other.languages).length > 0 &&
+          languageCompatible(user.languages, other.languages) &&
           genderCompatible(user.gender, user.lookingFor, other.gender, other.lookingFor) &&
           !recentPairs.has(this.pairKey(user.id, other.id)),
       );
@@ -207,8 +209,28 @@ export class DailyMatchService {
     return match;
   }
 
-  /** Paid extra match (0.2 Pi) — bypasses the once-a-day rule. */
+  /**
+   * Paid extra match (0.2 Pi) — bypasses the once-a-day rule.
+   *
+   * The payment is verified here rather than trusted from the client: the
+   * caller must have a COMPLETED, not-yet-consumed payment with the extra-match
+   * memo, and it is marked consumed before the match is created so the same
+   * payment can't be replayed.
+   */
   async createExtraMatch(userId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        memo: EXTRA_MATCH_MEMO,
+        consumedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!payment) {
+      throw new BadRequestException('No completed payment found for an extra match');
+    }
+
     const eligible = await this.loadEligibleUsers();
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -231,7 +253,7 @@ export class DailyMatchService {
     const candidates = eligible.filter(
       (o) =>
         o.id !== userId &&
-        intersect(self.languages, o.languages).length > 0 &&
+        languageCompatible(self.languages, o.languages) &&
         genderCompatible(self.gender, self.lookingFor, o.gender, o.lookingFor) &&
         !recentPairs.has(this.pairKey(userId, o.id)),
     );
@@ -242,6 +264,14 @@ export class DailyMatchService {
     const best = candidates
       .map((c) => ({ c, score: this.score(self, c) }))
       .sort((x, y) => y.score - x.score)[0];
+
+    // Burn the payment only once a match is actually guaranteed — failing to
+    // find a candidate above leaves it unconsumed so the user can retry later
+    // without paying twice.
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: { consumedAt: new Date() },
+    });
 
     const match = await this.createMatch(userId, best.c.id, new Date());
     return this.getById(match.id, userId);

@@ -61,6 +61,19 @@ export function intersect(a: string[] = [], b: string[] = []): string[] {
 }
 
 /**
+ * Shared-language filter for pairing.
+ *
+ * An empty list means "unknown", not "speaks nothing" — the same treatment
+ * `genderCompatible` gives an empty lookingFor. Requiring a non-empty
+ * intersection outright would exclude every user who has never set a language,
+ * which is everyone until they do, leaving the matcher unable to pair anyone.
+ */
+export function languageCompatible(a: string[] = [], b: string[] = []): boolean {
+  if (a.length === 0 || b.length === 0) return true;
+  return intersect(a, b).length > 0;
+}
+
+/**
  * Mutual gender compatibility.
  *
  * lookingFor is a string[] on Profile (an existing column) and may contain
