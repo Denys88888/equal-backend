@@ -133,16 +133,31 @@ export class DailyMatchService {
 
     const busy = await this.prisma.dailyMatch.findMany({
       where: { status: { in: ['PENDING', 'ACTIVE', 'MUTUAL'] } },
-      select: { userAId: true, userBId: true, matchDate: true, userA: { select: { timezone: true } } },
+      select: {
+        userAId: true, userBId: true, matchDate: true, status: true,
+        userA: { select: { timezone: true } },
+        userB: { select: { timezone: true } },
+      },
     });
 
     const busySet = new Set<string>();
     for (const m of busy) {
-      // A match created earlier in the same local day still counts as "has one".
-      const dayStart = localDayStart(now, m.userA?.timezone || 'UTC');
-      if (m.matchDate >= dayStart) {
+      // A MUTUAL match is permanent — its participants are never "free" again
+      // for a new daily pairing regardless of when it was created.
+      if (m.status === 'MUTUAL') {
         busySet.add(m.userAId);
         busySet.add(m.userBId);
+        continue;
+      }
+      // "Same local day" is evaluated per participant: a pair can span
+      // timezones, and using one side's day boundary for both meant the other
+      // could be handed a second match while still holding a live one.
+      const sides: [string, string | undefined][] = [
+        [m.userAId, m.userA?.timezone],
+        [m.userBId, m.userB?.timezone],
+      ];
+      for (const [uid, tz] of sides) {
+        if (m.matchDate >= localDayStart(now, tz || 'UTC')) busySet.add(uid);
       }
     }
 
@@ -327,6 +342,10 @@ export class DailyMatchService {
     const mySent = counts.find((c) => c.senderId === userId)?._count._all ?? 0;
     const partnerSent = counts.find((c) => c.senderId === partner.id)?._count._all ?? 0;
 
+    const revealed =
+      (!!match.icebreakerAnswerA || match.icebreakerSkippedA) &&
+      (!!match.icebreakerAnswerB || match.icebreakerSkippedB);
+
     return {
       id: match.id,
       status: match.status,
@@ -338,14 +357,13 @@ export class DailyMatchService {
       icebreaker: {
         key: match.icebreakerKey,
         myAnswer: isA ? match.icebreakerAnswerA : match.icebreakerAnswerB,
-        partnerAnswer: isA ? match.icebreakerAnswerB : match.icebreakerAnswerA,
+        // Withheld until both sides are in. Redacted HERE, not in the callers,
+        // so every path out of this method is safe by construction — hiding it
+        // only in the UI would still ship the answer in the JSON response.
+        partnerAnswer: revealed ? (isA ? match.icebreakerAnswerB : match.icebreakerAnswerA) : null,
         mySkipped: isA ? match.icebreakerSkippedA : match.icebreakerSkippedB,
         partnerSkipped: isA ? match.icebreakerSkippedB : match.icebreakerSkippedA,
-        // Answers stay hidden until both sides are in — that is the whole point
-        // of the mechanic, so the server never sends the partner's text early.
-        revealed:
-          (!!match.icebreakerAnswerA || match.icebreakerSkippedA) &&
-          (!!match.icebreakerAnswerB || match.icebreakerSkippedB),
+        revealed,
       },
       partner: {
         id: partner.id,
@@ -374,12 +392,6 @@ export class DailyMatchService {
   private ageFrom(birthDate: Date): number {
     const diff = Date.now() - birthDate.getTime();
     return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-  }
-
-  /** Redacted view of the icebreaker: hides the partner's answer pre-reveal. */
-  private redactIcebreaker<T extends { icebreaker: { revealed: boolean; partnerAnswer: string | null } }>(payload: T): T {
-    if (!payload.icebreaker.revealed) payload.icebreaker.partnerAnswer = null;
-    return payload;
   }
 
   async getMessages(matchId: string, userId: string, page = 1, limit = 50) {
@@ -495,7 +507,7 @@ export class DailyMatchService {
     if (payload.icebreaker.revealed) {
       this.gateway.server?.to(`daily:${matchId}`).emit('daily:icebreaker-revealed', { matchId });
     }
-    return this.redactIcebreaker(payload);
+    return payload;
   }
 
   async skipIcebreaker(matchId: string, userId: string) {
@@ -509,7 +521,7 @@ export class DailyMatchService {
     if (payload.icebreaker.revealed) {
       this.gateway.server?.to(`daily:${matchId}`).emit('daily:icebreaker-revealed', { matchId });
     }
-    return this.redactIcebreaker(payload);
+    return payload;
   }
 
   // ── Expiry ────────────────────────────────────────────
@@ -589,8 +601,20 @@ export class DailyMatchService {
 
   // ── Reminder pushes ───────────────────────────────────
 
-  /** Fired by cron; `offsetMinutes` is relative to the user's match time. */
-  async sendReminders(now: Date, offsetMinutes: number, title: string, body: string) {
+  /**
+   * Fired by cron; `offsetMinutes` is relative to the user's match time.
+   *
+   * The window must match the cron's own interval. It previously used the
+   * default 15-minute window on a 5-minute cron, so each user got the same
+   * "5 minutes to go" push three times.
+   */
+  async sendReminders(
+    now: Date,
+    offsetMinutes: number,
+    title: string,
+    body: string,
+    windowMinutes = 5,
+  ) {
     const users = await this.prisma.user.findMany({
       where: { isActive: true, voiceIntroUrl: { not: null } },
       select: { id: true, timezone: true, dailyMatchTime: true },
@@ -599,15 +623,24 @@ export class DailyMatchService {
     let sent = 0;
     for (const u of users) {
       const shifted = new Date(now.getTime() + offsetMinutes * 60_000);
-      if (!isDue(shifted, u.timezone, u.dailyMatchTime)) continue;
+      if (!isDue(shifted, u.timezone, u.dailyMatchTime, windowMinutes)) continue;
       this.push.sendToUser(u.id, { title, body, url: '/#/daily-match', tag: 'daily-match' }).catch(() => {});
       sent++;
     }
     return sent;
   }
 
-  /** 20:00 nudge for people who have a live match but haven't written. */
+  /**
+   * Nudges people who have a live match but haven't written yet.
+   *
+   * Only fires at two points in the 24h window (19h and 1h remaining, i.e. the
+   * spec's 20:00 and next-day 14:00 for a 15:00 match). The hourly cron used to
+   * push on every single run, so a silent user could collect ~20 identical
+   * notifications over one match.
+   */
   async remindSilent(now = new Date()) {
+    const REMINDER_HOURS_LEFT = [19, 1];
+
     const active = await this.prisma.dailyMatch.findMany({
       where: { status: 'ACTIVE', chatExpiresAt: { gt: now } },
       select: { id: true, userAId: true, userBId: true, chatExpiresAt: true },
@@ -615,13 +648,15 @@ export class DailyMatchService {
 
     let sent = 0;
     for (const match of active) {
+      const hoursLeft = Math.round((match.chatExpiresAt.getTime() - now.getTime()) / 3_600_000);
+      if (!REMINDER_HOURS_LEFT.includes(hoursLeft)) continue;
+
       const senders = await this.prisma.dailyMatchMessage.findMany({
         where: { dailyMatchId: match.id },
         select: { senderId: true },
         distinct: ['senderId'],
       });
       const wrote = new Set(senders.map((s) => s.senderId));
-      const hoursLeft = Math.max(0, Math.round((match.chatExpiresAt.getTime() - now.getTime()) / 3_600_000));
 
       for (const uid of [match.userAId, match.userBId]) {
         if (wrote.has(uid)) continue;
