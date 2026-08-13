@@ -60,6 +60,12 @@ async function bootstrap() {
     res.send('pong');
   });
 
+  // Pi Developer Portal domain ownership validation file
+  httpAdapter.get('/validation-key.txt', (_req: unknown, res: { setHeader: (k: string, v: string) => void; send: (v: string) => void }) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send('79895a31d330c1e6a3eb0ce3b0253abc0a4d54603f8b2f231d2f82e05977671ac86c63b3aebeb1fbd14cdd446f132a2dab8d7f45651ef754dc682df20aedb26f');
+  });
+
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`API running on port ${port}`);
