@@ -35,43 +35,77 @@ export class PaymentsService {
     });
   }
 
+  private async piApiFetch(url: string, options: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      console.error(`[payments] pi api fetch error url=${url}`, err);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async approve(paymentId: string) {
-    // Validate payment exists in our DB first
     const payment = await this.prisma.payment.findFirst({
       where: { OR: [{ id: paymentId }, { piPaymentId: paymentId }] },
     });
 
-    const piRes = await fetch(`${PI_API_BASE}/payments/${paymentId}/approve`, {
-      method: 'POST',
-      headers: { Authorization: `Key ${this.apiKey}` },
-    });
-    if (!piRes.ok) {
-      throw new InternalServerErrorException(`Pi approve failed: ${await piRes.text()}`);
+    console.error(`[payments] approve start piId=${paymentId} dbFound=${!!payment}`);
+
+    let piRes: Response;
+    try {
+      piRes = await this.piApiFetch(`${PI_API_BASE}/payments/${paymentId}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Key ${this.apiKey}` },
+      });
+    } catch (err) {
+      console.error(`[payments] approve fetch threw piId=${paymentId}`, err);
+      throw new InternalServerErrorException(`Pi approve fetch failed: ${String(err)}`);
     }
-    const piData = await piRes.json();
+
+    const body = await piRes.text();
+    console.error(`[payments] approve pi response piId=${paymentId} status=${piRes.status} body=${body}`);
+
+    if (!piRes.ok) {
+      throw new InternalServerErrorException(`Pi approve failed ${piRes.status}: ${body}`);
+    }
+    const piData = JSON.parse(body);
 
     if (payment) {
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: { status: 'APPROVED', piPaymentId: paymentId },
       });
-    } else {
-      // Payment not in our DB (e.g. recovery flow) — still allow Pi to proceed
     }
 
     return piData;
   }
 
   async complete(paymentId: string, txid: string) {
-    const piRes = await fetch(`${PI_API_BASE}/payments/${paymentId}/complete`, {
-      method: 'POST',
-      headers: { Authorization: `Key ${this.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ txid }),
-    });
-    if (!piRes.ok) {
-      throw new InternalServerErrorException(`Pi complete failed: ${await piRes.text()}`);
+    console.error(`[payments] complete start piId=${paymentId} txid=${txid}`);
+
+    let piRes: Response;
+    try {
+      piRes = await this.piApiFetch(`${PI_API_BASE}/payments/${paymentId}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Key ${this.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txid }),
+      });
+    } catch (err) {
+      console.error(`[payments] complete fetch threw piId=${paymentId}`, err);
+      throw new InternalServerErrorException(`Pi complete fetch failed: ${String(err)}`);
     }
-    const piData = await piRes.json();
+
+    const body = await piRes.text();
+    console.error(`[payments] complete pi response piId=${paymentId} status=${piRes.status} body=${body}`);
+
+    if (!piRes.ok) {
+      throw new InternalServerErrorException(`Pi complete failed ${piRes.status}: ${body}`);
+    }
+    const piData = JSON.parse(body);
 
     await this.prisma.payment.updateMany({
       where: { piPaymentId: paymentId },
