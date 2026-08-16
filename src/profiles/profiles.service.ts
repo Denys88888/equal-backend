@@ -153,7 +153,12 @@ export class ProfilesService {
     // In-app taps pass a user id; shared /u/:username links pass a username.
     // Resolving both here keeps every caller below working with a real id.
     const resolved = await this.prisma.user.findFirst({
-      where: { OR: [{ id: handle }, { username: handle }], isActive: true },
+      // Username folded to be case-insensitive: shared /u/ links are typed by
+      // hand and the owner's handle is capitalised ("Cherry19899").
+      where: {
+        OR: [{ id: handle }, { username: { equals: handle, mode: 'insensitive' } }],
+        isActive: true,
+      },
       select: { id: true },
     });
     if (!resolved) throw new NotFoundException('Profile not found');

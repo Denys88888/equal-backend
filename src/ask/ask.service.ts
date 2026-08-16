@@ -38,6 +38,15 @@ const AUTOBAN_DURATION_MS = 24 * 60 * 60 * 1000;
 
 const PAGE_SIZE = 20;
 
+/**
+ * Case-insensitive username match.
+ *
+ * Share links are typed and re-typed by humans, and this codebase has already
+ * been bitten once by matching the owner's "Cherry19899" only in lowercase.
+ * Ids stay exact — only the human-facing handle is folded.
+ */
+const insensitive = (value: string) => ({ equals: value, mode: 'insensitive' as const });
+
 /** Shape returned for a publicly visible Q&A card. */
 export interface PublicAsk {
   id: string;
@@ -178,7 +187,7 @@ export class AskService {
    */
   async getPublic(targetId: string, page = 1, viewerId?: string) {
     const target = await this.prisma.user.findFirst({
-      where: { OR: [{ id: targetId }, { username: targetId }], isActive: true },
+      where: { OR: [{ id: targetId }, { username: insensitive(targetId) }], isActive: true },
       select: { id: true, name: true, username: true },
     });
     if (!target) throw new NotFoundException('Profile not found');
@@ -274,7 +283,7 @@ export class AskService {
     dto: { content: string; isAnonymous?: boolean; isUrgent?: boolean },
   ) {
     const target = await this.prisma.user.findFirst({
-      where: { OR: [{ id: targetIdOrUsername }, { username: targetIdOrUsername }], isActive: true },
+      where: { OR: [{ id: targetIdOrUsername }, { username: insensitive(targetIdOrUsername) }], isActive: true },
       select: { id: true },
     });
     if (!target) throw new NotFoundException('Profile not found');
