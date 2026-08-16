@@ -48,12 +48,13 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * @param paymentId — the **Pi** payment id from onReadyForServerApproval,
+   *   which is not our row id. The two are linked through the metadata the
+   *   client attached at createPayment time (see below).
+   */
   async approve(paymentId: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { OR: [{ id: paymentId }, { piPaymentId: paymentId }] },
-    });
-
-    console.error(`[payments] approve start piId=${paymentId} dbFound=${!!payment}`);
+    console.error(`[payments] approve start piId=${paymentId}`);
 
     let piRes: Response;
     try {
@@ -72,13 +73,36 @@ export class PaymentsService {
     if (!piRes.ok) {
       throw new InternalServerErrorException(`Pi approve failed ${piRes.status}: ${body}`);
     }
-    const piData = JSON.parse(body);
+    const piData = JSON.parse(body) as {
+      metadata?: { paymentIdentifier?: string };
+    };
+
+    // The client puts our row id in metadata.paymentIdentifier at createPayment
+    // time, and Pi echoes the metadata back here. That echo is the ONLY link
+    // between the Pi payment and our row: looking the row up by the Pi id finds
+    // nothing, because piPaymentId is exactly what this call is here to set.
+    // Without this the row stays PENDING forever and complete() updates 0 rows.
+    const ourId = piData.metadata?.paymentIdentifier;
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        OR: [
+          ...(ourId ? [{ id: ourId }] : []),
+          { piPaymentId: paymentId },
+        ],
+      },
+    });
+
+    console.error(
+      `[payments] approve linked piId=${paymentId} ourId=${ourId ?? 'none'} dbFound=${!!payment}`,
+    );
 
     if (payment) {
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: { status: 'APPROVED', piPaymentId: paymentId },
       });
+    } else {
+      console.error(`[payments] approve: no local row for piId=${paymentId} — cannot mark APPROVED`);
     }
 
     return piData;
@@ -105,12 +129,33 @@ export class PaymentsService {
     if (!piRes.ok) {
       throw new InternalServerErrorException(`Pi complete failed ${piRes.status}: ${body}`);
     }
-    const piData = JSON.parse(body);
+    const piData = JSON.parse(body) as {
+      metadata?: { paymentIdentifier?: string };
+    };
 
-    await this.prisma.payment.updateMany({
+    // Normally approve() has already stamped piPaymentId. The metadata fallback
+    // covers a payment whose approve call didn't link (older rows, or an approve
+    // that errored) — without it the row would stay PENDING despite real money
+    // having moved, and nothing downstream would ever honour it.
+    const updated = await this.prisma.payment.updateMany({
       where: { piPaymentId: paymentId },
       data: { status: 'COMPLETED', txid },
     });
+
+    if (updated.count === 0) {
+      const ourId = piData.metadata?.paymentIdentifier;
+      if (ourId) {
+        const recovered = await this.prisma.payment.updateMany({
+          where: { id: ourId },
+          data: { status: 'COMPLETED', txid, piPaymentId: paymentId },
+        });
+        console.error(
+          `[payments] complete recovered via metadata piId=${paymentId} ourId=${ourId} rows=${recovered.count}`,
+        );
+      } else {
+        console.error(`[payments] complete: no local row for piId=${paymentId} — money moved, row not updated`);
+      }
+    }
 
     return piData;
   }

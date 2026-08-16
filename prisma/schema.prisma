@@ -63,6 +63,60 @@ model User {
   dailyMatchMessages DailyMatchMessage[]
   matchLogs MatchLog[]
   waitingList WaitingList[]
+  questionsAsked  AskQuestion[] @relation("AskAsker")
+  questionsReceived AskQuestion[] @relation("AskTarget")
+  askLikes        AskLike[]
+}
+
+// ── Equal Ask ───────────────────────────────────────────
+// Public Q&A on a profile. Deliberately separate from Message/DailyMatchMessage:
+// those are private 1:1 threads, whereas an answered question is public on the
+// target's profile and is the feature's whole point (shareable, viral).
+
+enum AskStatus {
+  PENDING
+  ANSWERED
+  REJECTED
+  REPORTED
+}
+
+model AskQuestion {
+  id        String   @id @default(cuid())
+  // Nullable so deleting the asker's account leaves the public answer intact
+  // rather than cascading away the target's content. isAnonymous only hides the
+  // name in API responses — the row always knows who asked, so report/ban works.
+  askerId   String?
+  targetId  String
+  content   String   @db.VarChar(500)
+  isAnonymous Boolean @default(false)
+  isUrgent  Boolean  @default(false)
+  status    AskStatus @default(PENDING)
+  answer    String?  @db.VarChar(1000)
+  answeredAt DateTime?
+  // Denormalised counter for list rendering; AskLike remains the source of truth.
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  asker     User?    @relation("AskAsker", fields: [askerId], references: [id], onDelete: SetNull)
+  target    User     @relation("AskTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  likedBy   AskLike[]
+
+  @@index([targetId, status, createdAt])
+  @@index([askerId, createdAt])
+}
+
+model AskLike {
+  id          String @id @default(cuid())
+  questionId  String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  question    AskQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The replay guard: a second like from the same user collides here instead of
+  // incrementing twice.
+  @@unique([questionId, userId])
 }
 
 // ── Daily Match ─────────────────────────────────────────

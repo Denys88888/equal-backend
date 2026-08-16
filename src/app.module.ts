@@ -18,6 +18,7 @@ import { AdminModule } from './admin/admin.module';
 import { VerificationModule } from './verification/verification.module';
 import { SettingsModule } from './settings/settings.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { AskModule } from './ask/ask.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SettingsModule,
     GatewayModule,
     DailyMatchModule,
+    AskModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerProxyGuard }],
 })

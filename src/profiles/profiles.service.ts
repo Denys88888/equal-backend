@@ -149,7 +149,16 @@ export class ProfilesService {
    * which had nowhere to send the user: no screen anywhere in the app could
    * show another person's profile except your own swipe deck.
    */
-  async getPublicProfile(viewerId: string, targetId: string) {
+  async getPublicProfile(viewerId: string, handle: string) {
+    // In-app taps pass a user id; shared /u/:username links pass a username.
+    // Resolving both here keeps every caller below working with a real id.
+    const resolved = await this.prisma.user.findFirst({
+      where: { OR: [{ id: handle }, { username: handle }], isActive: true },
+      select: { id: true },
+    });
+    if (!resolved) throw new NotFoundException('Profile not found');
+    const targetId = resolved.id;
+
     if (viewerId === targetId) throw new BadRequestException('Cannot view your own profile this way');
 
     const blocked = await this.prisma.swipeAction.findFirst({
