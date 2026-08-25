@@ -5,18 +5,37 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EventsService {
   constructor(private prisma: PrismaService) {}
 
-  async getOne(eventId: string) {
-    return this.prisma.event.findUnique({
-      where: { id: eventId },
-      include: { _count: { select: { rsvps: true } } },
-    });
+  /**
+   * Attach the caller's own RSVP status. Without this the client has no way to
+   * know what it already booked: the Events screen started every session with
+   * an empty "going" set, so after a reload a paid ticket looked unbought and
+   * the Buy button came back — offering to charge for it a second time.
+   */
+  private withMyRsvp<T extends { rsvps?: { status: string }[] }>(event: T) {
+    const { rsvps, ...rest } = event;
+    return { ...rest, myRsvpStatus: rsvps?.[0]?.status ?? null };
   }
 
-  async getAll() {
-    return this.prisma.event.findMany({
-      orderBy: { date: 'asc' },
-      include: { _count: { select: { rsvps: true } } },
+  async getOne(eventId: string, userId?: string) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        _count: { select: { rsvps: true } },
+        ...(userId ? { rsvps: { where: { userId }, select: { status: true } } } : {}),
+      },
     });
+    return event ? this.withMyRsvp(event) : event;
+  }
+
+  async getAll(userId?: string) {
+    const events = await this.prisma.event.findMany({
+      orderBy: { date: 'asc' },
+      include: {
+        _count: { select: { rsvps: true } },
+        ...(userId ? { rsvps: { where: { userId }, select: { status: true } } } : {}),
+      },
+    });
+    return events.map((e) => this.withMyRsvp(e));
   }
 
   async rsvp(eventId: string, userId: string, status: string) {
