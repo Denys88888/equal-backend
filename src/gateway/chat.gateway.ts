@@ -8,11 +8,12 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { allowedOrigins } from '../common/allowed-origins';
 
 /** Socket with the identity we resolved from the handshake token. */
 type AuthedSocket = Socket & { userId?: string };
 
-@WebSocketGateway({ cors: { origin: '*' } })
+@WebSocketGateway({ cors: { origin: allowedOrigins, credentials: true } })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
 
@@ -43,6 +44,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = await this.jwt.verifyAsync(token);
       const userId = payload?.sub ?? payload?.id ?? payload?.userId;
       if (!userId) throw new Error('token has no subject');
+      // This path verifies the token itself and never goes through JwtStrategy,
+      // so the suspension check has to be repeated here.
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { isActive: true, bannedUntil: true },
+      });
+      if (!user?.isActive) throw new Error('account is deactivated');
+      if (user.bannedUntil && user.bannedUntil.getTime() > Date.now()) {
+        throw new Error('account is temporarily banned');
+      }
       client.userId = userId;
       // Own room, so the server can always reach this user without trusting input
       client.join(`user:${userId}`);

@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PI_API_BASE = 'https://api.minepi.com/v2';
@@ -53,8 +59,16 @@ export class PaymentsService {
    *   which is not our row id. The two are linked through the metadata the
    *   client attached at createPayment time (see below).
    */
-  async approve(paymentId: string) {
+  async approve(userId: string, paymentId: string) {
     console.error(`[payments] approve start piId=${paymentId}`);
+
+    // When the row is already linked (a retry, or onIncompletePaymentFound) we
+    // can establish ownership before spending a Pi API call. The unlinked case
+    // is re-checked below, once Pi's metadata tells us which row this is.
+    const known = await this.prisma.payment.findFirst({ where: { piPaymentId: paymentId } });
+    if (known && known.userId !== userId) {
+      throw new ForbiddenException('Payment belongs to another user');
+    }
 
     let piRes: Response;
     try {
@@ -97,6 +111,9 @@ export class PaymentsService {
     );
 
     if (payment) {
+      if (payment.userId !== userId) {
+        throw new ForbiddenException('Payment belongs to another user');
+      }
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: { status: 'APPROVED', piPaymentId: paymentId },
@@ -108,8 +125,22 @@ export class PaymentsService {
     return piData;
   }
 
-  async complete(paymentId: string, txid: string) {
+  async complete(userId: string, paymentId: string, txid: string) {
     console.error(`[payments] complete start piId=${paymentId} txid=${txid}`);
+
+    const known = await this.prisma.payment.findFirst({ where: { piPaymentId: paymentId } });
+    if (known) {
+      if (known.userId !== userId) {
+        throw new ForbiddenException('Payment belongs to another user');
+      }
+      // Idempotency: the Pi SDK retries complete() (and onIncompletePaymentFound
+      // replays it on the next login), so without this a single purchase can be
+      // re-processed and credited more than once.
+      if (known.status === 'COMPLETED') {
+        console.error(`[payments] complete: already COMPLETED piId=${paymentId} — no-op`);
+        return { identifier: paymentId, status: 'already_completed' };
+      }
+    }
 
     let piRes: Response;
     try {
@@ -137,8 +168,10 @@ export class PaymentsService {
     // covers a payment whose approve call didn't link (older rows, or an approve
     // that errored) — without it the row would stay PENDING despite real money
     // having moved, and nothing downstream would ever honour it.
+    // Every write is scoped to the caller, so a guessed payment id can never
+    // mutate someone else's row even on the recovery path below.
     const updated = await this.prisma.payment.updateMany({
-      where: { piPaymentId: paymentId },
+      where: { piPaymentId: paymentId, userId, status: { not: 'COMPLETED' } },
       data: { status: 'COMPLETED', txid },
     });
 
@@ -146,7 +179,7 @@ export class PaymentsService {
       const ourId = piData.metadata?.paymentIdentifier;
       if (ourId) {
         const recovered = await this.prisma.payment.updateMany({
-          where: { id: ourId },
+          where: { id: ourId, userId, status: { not: 'COMPLETED' } },
           data: { status: 'COMPLETED', txid, piPaymentId: paymentId },
         });
         console.error(

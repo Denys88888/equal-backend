@@ -35,14 +35,18 @@ export class PaymentsController {
   @Post(':paymentId/approve')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async approve(@Param('paymentId') paymentId: string) {
-    return this.paymentsService.approve(paymentId);
+  async approve(@Request() req: { user: { id: string } }, @Param('paymentId') paymentId: string) {
+    return this.paymentsService.approve(req.user.id, paymentId);
   }
 
   @Post(':paymentId/complete')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async complete(@Param('paymentId') paymentId: string, @Body() body: { txid: string }) {
-    return this.paymentsService.complete(paymentId, body.txid);
+  async complete(
+    @Request() req: { user: { id: string } },
+    @Param('paymentId') paymentId: string,
+    @Body() body: { txid: string },
+  ) {
+    return this.paymentsService.complete(req.user.id, paymentId, body.txid);
   }
 }

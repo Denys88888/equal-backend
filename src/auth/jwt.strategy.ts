@@ -18,9 +18,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: { sub: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, name: true, role: true, isActive: true, bannedUntil: true },
     });
     if (!user) throw new UnauthorizedException();
+    // BannedGuard only covers the 3 controllers that opt into it; this runs on
+    // every authenticated request, so it's the one place a suspended or
+    // temporarily-banned account is actually shut out everywhere.
+    if (!user.isActive) throw new UnauthorizedException('Account is deactivated');
+    if (user.bannedUntil && user.bannedUntil.getTime() > Date.now()) {
+      throw new UnauthorizedException('Account is temporarily banned');
+    }
     return user;
   }
 }

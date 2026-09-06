@@ -6,6 +6,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './sentry.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { isOriginAllowed } from './common/allowed-origins';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -25,15 +26,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  const allowedOrigins = [
-    'https://equal-app.onrender.com',
-    'https://denys88888.github.io',
-    'http://localhost:3000',
-    'http://localhost:5173',
-  ];
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      if (isOriginAllowed(origin)) callback(null, true);
       else callback(new Error('Not allowed by CORS'));
     },
     credentials: true,

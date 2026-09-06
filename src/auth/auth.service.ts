@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -71,6 +71,10 @@ export class AuthService {
           username,
         },
       });
+    } else if (!user.isActive) {
+      throw new ForbiddenException('Account is deactivated');
+    } else if (user.bannedUntil && user.bannedUntil.getTime() > Date.now()) {
+      throw new ForbiddenException('Account is temporarily banned');
     }
 
     user = await this.syncAdminRole(user, piUser.username);
