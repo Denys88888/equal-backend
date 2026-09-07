@@ -27,10 +27,11 @@ async function bootstrap() {
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
-    origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) callback(null, true);
-      else callback(new Error('Not allowed by CORS'));
-    },
+    // Rejecting by returning `false` rather than an Error: the browser still
+    // blocks the response (no allow-origin header), but the request finishes as
+    // a normal 200 instead of an unhandled 500 that Sentry books as a server
+    // fault on every scan and stray origin.
+    origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
     credentials: true,
   });
 

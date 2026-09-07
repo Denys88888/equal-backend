@@ -65,7 +65,7 @@ export class AdminService {
     const users = await this.prisma.user.findMany({
       select: {
         id: true, name: true, email: true, trustScore: true, verified: true,
-        isActive: true, badges: true, createdAt: true,
+        isActive: true, bannedUntil: true, badges: true, createdAt: true,
         profile: { select: { bio: true } },
         _count: { select: { matches1: true, matches2: true } },
       },
@@ -82,7 +82,13 @@ export class AdminService {
       badges: u.badges,
       bio: u.profile?.bio ?? '',
       matches: u._count.matches1 + u._count.matches2,
-      status: u.isActive ? 'Active' : 'Banned',
+      // An auto-ban (3 reports in 24h) sets only bannedUntil and leaves
+      // isActive true. Reporting that as "Active" hid those accounts from the
+      // admin's unban action, which is the only way to release them early.
+      status:
+        !u.isActive || (u.bannedUntil && u.bannedUntil.getTime() > Date.now())
+          ? 'Banned'
+          : 'Active',
       joinDate: u.createdAt,
     }));
   }
@@ -90,7 +96,13 @@ export class AdminService {
   async setBan(userId: string, banned: boolean) {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) throw new NotFoundException('User not found');
-    await this.prisma.user.update({ where: { id: userId }, data: { isActive: !banned } });
+    // Unbanning must clear bannedUntil too: the auto-ban (3 reports in 24h)
+    // sets only that field, so flipping isActive alone left the account locked
+    // out with no way for an admin to release it before the timer ran out.
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: banned ? { isActive: false } : { isActive: true, bannedUntil: null },
+    });
     return { success: true, status: banned ? 'Banned' : 'Active' };
   }
 
