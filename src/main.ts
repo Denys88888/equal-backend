@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './sentry.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { isOriginAllowed } from './common/allowed-origins';
+import { piApiStatus, refreshPiApiStatusIfStale } from './common/pi-api-status';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -47,7 +48,10 @@ async function bootstrap() {
   // Health check at /v1/health (matches render.yaml healthCheckPath)
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/v1/health', (_req: unknown, res: { json: (v: unknown) => void }) => {
-    res.json({ status: 'ok', ts: Date.now() });
+    // Kicked off, never awaited — see pi-api-status.ts for why health must stay
+    // instant and must not go red when Pi is unreachable.
+    refreshPiApiStatusIfStale();
+    res.json({ status: 'ok', ts: Date.now(), pi_api: piApiStatus() });
   });
 
   // Cheap unauthenticated keep-alive target. Deliberately outside the /v1
