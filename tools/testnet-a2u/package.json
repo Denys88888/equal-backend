@@ -1,0 +1,12 @@
+{
+  "name": "equal-testnet-a2u",
+  "private": true,
+  "type": "module",
+  "description": "One-off tool: send App-to-User test-Pi from the Equal TESTNET app, to meet Pi's 5-unique-wallet requirement for a mainnet app wallet. Never deployed.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "stellar-sdk": "10.4.1"
+  }
+}

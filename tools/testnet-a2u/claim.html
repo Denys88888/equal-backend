@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equal · Testnet</title>
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1f1b24; background: #faf8fc; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { line-height: 1.5; color: #4a4452; }
+  button { width: 100%; padding: 14px; font-size: 16px; font-weight: 600; border: 0; border-radius: 999px; background: #6b3fa0; color: #fff; margin-top: 12px; }
+  button:disabled { opacity: .5; }
+  #uid { display: block; word-break: break-all; font-size: 15px; background: #fff; border: 1px solid #ddd3e8; border-radius: 10px; padding: 12px; margin-top: 6px; }
+  #err { color: #b3261e; }
+  small { color: #7a7282; }
+</style>
+</head>
+<body>
+  <h1>Equal · Testnet</h1>
+  <p>
+    Помогите запустить оплату в Equal: войдите через Pi и отправьте разработчику
+    свой ID со страницы ниже. Вы получите <b>0.01 тестового π</b> — это не настоящие деньги.
+  </p>
+  <p><small>Help launch payments in Equal: sign in with Pi and send the developer your ID below.
+    You will receive 0.01 test-Pi (not real Pi).</small></p>
+
+  <button id="login">Войти через Pi · Sign in with Pi</button>
+
+  <div id="result" hidden>
+    <p>Имя / Username: <b id="username"></b></p>
+    <p>Ваш ID / Your ID:</p>
+    <code id="uid"></code>
+    <button id="copy">Скопировать ID · Copy ID</button>
+  </div>
+
+  <p id="err"></p>
+
+<script>
+  var err = document.getElementById('err');
+  var login = document.getElementById('login');
+
+  // No sandbox flag: inside Pi Browser the network follows the app registered
+  // for this URL, which must be the Equal TESTNET app.
+  Pi.init({ version: '2.0' });
+
+  login.onclick = function () {
+    err.textContent = '';
+    login.disabled = true;
+
+    // window.Pi exists in every browser, but authenticate() only resolves in
+    // Pi Browser — anywhere else it hangs forever, so give it a deadline.
+    var deadline = setTimeout(function () {
+      err.textContent = 'Откройте эту страницу в Pi Browser. / Open this page in Pi Browser.';
+      login.disabled = false;
+    }, 20000);
+
+    Pi.authenticate(['username', 'payments'], function onIncomplete() {})
+      .then(function (auth) {
+        clearTimeout(deadline);
+        document.getElementById('username').textContent = auth.user.username;
+        document.getElementById('uid').textContent = auth.user.uid;
+        document.getElementById('result').hidden = false;
+        login.hidden = true;
+      })
+      .catch(function (e) {
+        clearTimeout(deadline);
+        err.textContent = 'Не удалось войти / Sign-in failed: ' + (e && e.message ? e.message : e);
+        login.disabled = false;
+      });
+  };
+
+  document.getElementById('copy').onclick = function () {
+    var uid = document.getElementById('uid').textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(uid) : Promise.reject())
+      .then(function () { document.getElementById('copy').textContent = 'Скопировано ✓ · Copied ✓'; })
+      .catch(function () { err.textContent = 'Скопируйте ID вручную / Copy the ID by hand.'; });
+  };
+</script>
+</body>
+</html>

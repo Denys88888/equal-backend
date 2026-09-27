@@ -3,3 +3,7 @@ dist/
 .env
 .env.local
 *.log
+
+# testnet A2U tool — credentials and the local payout ledger never get committed
+tools/testnet-a2u/.env.testnet
+tools/testnet-a2u/payouts.log.json
