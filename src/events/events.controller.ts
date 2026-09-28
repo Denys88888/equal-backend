@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { EventsService } from './events.service';
+import { CreateEventDto } from './events.dto';
 
 @ApiTags('Events')
 @Controller('events')
@@ -15,6 +16,14 @@ export class EventsController {
   @UseGuards(OptionalJwtAuthGuard)
   async getEvents(@Request() req: { user?: { id: string } }) {
     return this.eventsService.getAll(req.user?.id);
+  }
+
+  /** Any signed-in user may propose an event; it stays hidden until an admin approves it. */
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async createEvent(@Request() req: { user: { id: string } }, @Body() dto: CreateEventDto) {
+    return this.eventsService.create(dto, req.user.id);
   }
 
   @Get(':id')

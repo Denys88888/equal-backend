@@ -1,5 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateEventDto } from './events.dto';
+
+/** How many of a user's events may wait for review at once — a cap on spam, not on activity. */
+export const MAX_PENDING_EVENTS_PER_USER = 3;
 
 @Injectable()
 export class EventsService {
@@ -24,11 +28,17 @@ export class EventsService {
         ...(userId ? { rsvps: { where: { userId }, select: { status: true } } } : {}),
       },
     });
-    return event ? this.withMyRsvp(event) : event;
+    if (!event) return event;
+    // An unapproved event exists only for its author until an admin approves it.
+    if (event.status !== 'ACTIVE' && event.createdBy !== userId) return null;
+    return this.withMyRsvp(event);
   }
 
   async getAll(userId?: string) {
     const events = await this.prisma.event.findMany({
+      // Same rule as clubs: approved events for everyone, plus the caller's own
+      // pending ones so they can see what they submitted is waiting.
+      where: userId ? { OR: [{ status: 'ACTIVE' }, { createdBy: userId }] } : { status: 'ACTIVE' },
       orderBy: { date: 'asc' },
       include: {
         _count: { select: { rsvps: true } },
@@ -42,9 +52,11 @@ export class EventsService {
     const normalizedStatus = status.toUpperCase() as 'GOING' | 'INTERESTED' | 'NOT_GOING';
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { price: true, maxAttendees: true, _count: { select: { rsvps: true } } },
+      select: { price: true, maxAttendees: true, status: true, _count: { select: { rsvps: true } } },
     });
-    if (!event) throw new NotFoundException('Event not found');
+    // A pending event is invisible, so it must also be unbookable — otherwise its
+    // id alone would let people RSVP to something an admin never approved.
+    if (!event || event.status !== 'ACTIVE') throw new NotFoundException('Event not found');
 
     if (normalizedStatus === 'GOING') {
       // Capacity — the UI advertises maxAttendees but nothing enforced it
@@ -83,5 +95,39 @@ export class EventsService {
     await this.prisma.event.update({ where: { id: eventId }, data: { attendeeCount: goingCount } });
 
     return rsvp;
+  }
+
+  /**
+   * A user proposes an event. It is created PENDING and free: price is set only
+   * by an admin (ticket Pi is paid to the app, not the organiser), and nothing
+   * here reads price/status/featured — CreateEventDto does not carry them.
+   */
+  async create(dto: CreateEventDto, userId: string) {
+    const when = new Date(dto.date);
+    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      throw new BadRequestException('Event date must be in the future');
+    }
+
+    const pending = await this.prisma.event.count({ where: { createdBy: userId, status: 'PENDING' } });
+    if (pending >= MAX_PENDING_EVENTS_PER_USER) {
+      throw new BadRequestException(
+        `You already have ${MAX_PENDING_EVENTS_PER_USER} events waiting for review`,
+      );
+    }
+
+    return this.prisma.event.create({
+      data: {
+        title: dto.title.trim(),
+        description: dto.description?.trim() || null,
+        date: when,
+        location: dto.location.trim(),
+        city: dto.city.trim(),
+        category: dto.category,
+        maxAttendees: dto.maxAttendees ?? null,
+        price: 0,
+        status: 'PENDING',
+        createdBy: userId,
+      },
+    });
   }
 }

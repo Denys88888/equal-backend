@@ -121,6 +121,13 @@ export class AdminController {
     return this.adminService.getEvents();
   }
 
+  @Post('events/:id/approve')
+  async approveEvent(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
+    this.checkAdmin(req);
+    return this.adminService.approveEvent(id);
+  }
+
+  // Rejecting a user-submitted event is deleting it — the same as clubs.
   @Delete('events/:id')
   async deleteEvent(@Request() req: { user: { role?: string } }, @Param('id') id: string) {
     this.checkAdmin(req);

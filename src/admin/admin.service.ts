@@ -179,7 +179,10 @@ export class AdminService {
     const events = await this.prisma.event.findMany({
       orderBy: { date: 'desc' },
       take: 100,
-      include: { _count: { select: { rsvps: true } } },
+      include: {
+        _count: { select: { rsvps: true } },
+        creator: { select: { name: true } },
+      },
     });
     const now = Date.now();
     return events.map((e) => ({
@@ -195,7 +198,17 @@ export class AdminService {
       attendees: e._count.rsvps,
       featured: e.featured,
       status: e.date.getTime() > now ? 'Upcoming' : 'Past',
+      // Separate from `status` (which is about time): whether users can see it yet.
+      moderation: e.status,
+      createdBy: e.creator?.name ?? '',
     }));
+  }
+
+  async approveEvent(eventId: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!event) throw new NotFoundException('Event not found');
+    await this.prisma.event.update({ where: { id: eventId }, data: { status: 'ACTIVE' } });
+    return { success: true };
   }
 
   async deleteEvent(eventId: string) {

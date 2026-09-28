@@ -58,6 +58,7 @@ model User {
   reportsAgainst Report[] @relation("ReportTarget")
   clubPostComments ClubPostComment[]
   createdClubs Club[] @relation("ClubCreator")
+  createdEvents Event[] @relation("EventCreator")
   dailyMatchesA DailyMatch[] @relation("DailyMatchUserA")
   dailyMatchesB DailyMatch[] @relation("DailyMatchUserB")
   dailyMatchMessages DailyMatchMessage[]
@@ -375,8 +376,21 @@ model Event {
   attendeeCount Int @default(0)
   featured     Boolean @default(false)
   createdAt    DateTime @default(now())
+  // User-created events start PENDING and stay hidden until an admin approves
+  // them. ACTIVE is the default so events created before this existed — and
+  // any an admin creates — stay visible.
+  status       EventStatus @default(ACTIVE)
+  createdBy    String?
+  creator      User? @relation("EventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   rsvps        EventRsvp[]
+
+  @@index([status])
+}
+
+enum EventStatus {
+  PENDING
+  ACTIVE
 }
 
 model EventRsvp {

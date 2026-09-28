@@ -101,3 +101,19 @@ describe('AdminService — ban lifecycle', () => {
     expect(user.status).toBe('Active');
   });
 });
+
+describe('AdminService — event moderation', () => {
+  it('approving an event makes it visible (ACTIVE)', async () => {
+    const prisma = {
+      event: { findUnique: vi.fn().mockResolvedValue({ id: 'e1' }), update: vi.fn().mockResolvedValue({}) },
+    };
+    await new AdminService(prisma as never).approveEvent('e1');
+    expect(prisma.event.update).toHaveBeenCalledWith({ where: { id: 'e1' }, data: { status: 'ACTIVE' } });
+  });
+
+  it('refuses to approve an event that does not exist', async () => {
+    const prisma = { event: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() } };
+    await expect(new AdminService(prisma as never).approveEvent('nope')).rejects.toThrow(NotFoundException);
+    expect(prisma.event.update).not.toHaveBeenCalled();
+  });
+});
