@@ -154,3 +154,76 @@ describe('PaymentsService — payment ownership', () => {
     expect(fetchSpy).toHaveBeenCalled();
   });
 });
+
+describe('PaymentsService — /v1/health payment diagnostics', () => {
+  const FULL_ID = 'abcdefghijklmnop_PAY123';
+
+  function res(status: number, body: unknown) {
+    return { ok: status >= 200 && status < 300, status, text: () => Promise.resolve(JSON.stringify(body)) } as unknown as Response;
+  }
+
+  /** Route-aware fake: approve/complete answer `action`, GET /payments/:id answers `lookup`. */
+  function routedFetch(action: Response, lookup: Response) {
+    return vi.fn((url: string, init?: RequestInit) => {
+      const isAction = /\/(approve|complete)$/.test(url) && init?.method === 'POST';
+      return Promise.resolve(isAction ? action : lookup);
+    });
+  }
+
+  beforeEach(async () => {
+    process.env.PI_API_KEY = 'test-key';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    (await import('../common/payment-diagnostics')).resetPaymentDiagnostics();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('a Pi rejection whose payment the key cannot see is reported as visible:false (key belongs to another app)', async () => {
+    vi.stubGlobal('fetch', routedFetch(res(404, { error: 'payment_not_found' }), res(404, {})));
+    const { paymentDiagnostics } = await import('../common/payment-diagnostics');
+    const service = new PaymentsService(makePrisma() as never);
+
+    await expect(service.approve(OWNER, FULL_ID)).rejects.toThrow();
+
+    const d = paymentDiagnostics().approve!;
+    expect(d.outcome).toBe('pi_error');
+    expect(d.piStatus).toBe(404);
+    expect(d.piError).toContain('payment_not_found');
+    expect(d.paymentVisibleToKey).toBe(false);
+  });
+
+  it('a Pi rejection of a payment the key CAN see is reported as visible:true (key is right, Pi refused)', async () => {
+    vi.stubGlobal('fetch', routedFetch(res(400, { error: 'some_other_reason' }), res(200, {})));
+    const { paymentDiagnostics } = await import('../common/payment-diagnostics');
+    const service = new PaymentsService(makePrisma() as never);
+
+    await expect(service.approve(OWNER, FULL_ID)).rejects.toThrow();
+
+    expect(paymentDiagnostics().approve!.paymentVisibleToKey).toBe(true);
+  });
+
+  it('never exposes a successful Pi response or the full payment id on the public health endpoint', async () => {
+    const successBody = {
+      metadata: { paymentIdentifier: 'row1' },
+      user_uid: 'SECRET-USER-UID',
+      from_address: 'GUSERWALLETADDRESS',
+    };
+    vi.stubGlobal('fetch', routedFetch(res(200, successBody), res(200, {})));
+    const { paymentDiagnostics } = await import('../common/payment-diagnostics');
+    const prisma = makePrisma({
+      payment: { findFirst: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'row1', userId: OWNER }) },
+    });
+    const service = new PaymentsService(prisma as never);
+
+    await service.approve(OWNER, FULL_ID);
+
+    const exposed = JSON.stringify(paymentDiagnostics());
+    expect(paymentDiagnostics().approve).toMatchObject({ outcome: 'ok', linked: true, paymentRef: 'PAY123' });
+    expect(exposed).not.toContain('SECRET-USER-UID');
+    expect(exposed).not.toContain('GUSERWALLETADDRESS');
+    expect(exposed).not.toContain(FULL_ID);
+  });
+});

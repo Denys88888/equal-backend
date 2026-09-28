@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { recordPayment } from '../common/payment-diagnostics';
 
 const PI_API_BASE = 'https://api.minepi.com/v2';
 
@@ -67,6 +68,7 @@ export class PaymentsService {
     // is re-checked below, once Pi's metadata tells us which row this is.
     const known = await this.prisma.payment.findFirst({ where: { piPaymentId: paymentId } });
     if (known && known.userId !== userId) {
+      recordPayment('approve', { paymentId, outcome: 'forbidden' });
       throw new ForbiddenException('Payment belongs to another user');
     }
 
@@ -78,6 +80,7 @@ export class PaymentsService {
       });
     } catch (err) {
       console.error(`[payments] approve fetch threw piId=${paymentId}`, err);
+      recordPayment('approve', { paymentId, outcome: 'pi_unreachable', piError: String(err) });
       throw new InternalServerErrorException(`Pi approve fetch failed: ${String(err)}`);
     }
 
@@ -85,6 +88,13 @@ export class PaymentsService {
     console.error(`[payments] approve pi response piId=${paymentId} status=${piRes.status} body=${body}`);
 
     if (!piRes.ok) {
+      recordPayment('approve', {
+        paymentId,
+        outcome: 'pi_error',
+        piStatus: piRes.status,
+        piError: body,
+        paymentVisibleToKey: await this.visibleToKey(paymentId),
+      });
       throw new InternalServerErrorException(`Pi approve failed ${piRes.status}: ${body}`);
     }
     const piData = JSON.parse(body) as {
@@ -112,6 +122,7 @@ export class PaymentsService {
 
     if (payment) {
       if (payment.userId !== userId) {
+        recordPayment('approve', { paymentId, outcome: 'forbidden' });
         throw new ForbiddenException('Payment belongs to another user');
       }
       await this.prisma.payment.update({
@@ -122,7 +133,28 @@ export class PaymentsService {
       console.error(`[payments] approve: no local row for piId=${paymentId} — cannot mark APPROVED`);
     }
 
+    recordPayment('approve', { paymentId, outcome: 'ok', linked: !!payment });
     return piData;
+  }
+
+  /**
+   * Can this server's API key see the payment at all? Asked only after Pi
+   * rejects an approve/complete, to tell apart the two causes that look
+   * identical from the app: 404 means PI_API_KEY belongs to a different app
+   * than the one the payment was made in; 200 means the key is right and Pi
+   * refused for some other reason (its error body then says which).
+   */
+  private async visibleToKey(paymentId: string): Promise<boolean | null> {
+    try {
+      const res = await this.piApiFetch(`${PI_API_BASE}/payments/${paymentId}`, {
+        headers: { Authorization: `Key ${this.apiKey}` },
+      });
+      if (res.status === 200) return true;
+      if (res.status === 404) return false;
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   async complete(userId: string, paymentId: string, txid: string) {
@@ -131,6 +163,7 @@ export class PaymentsService {
     const known = await this.prisma.payment.findFirst({ where: { piPaymentId: paymentId } });
     if (known) {
       if (known.userId !== userId) {
+        recordPayment('complete', { paymentId, outcome: 'forbidden' });
         throw new ForbiddenException('Payment belongs to another user');
       }
       // Idempotency: the Pi SDK retries complete() (and onIncompletePaymentFound
@@ -151,6 +184,7 @@ export class PaymentsService {
       });
     } catch (err) {
       console.error(`[payments] complete fetch threw piId=${paymentId}`, err);
+      recordPayment('complete', { paymentId, outcome: 'pi_unreachable', piError: String(err) });
       throw new InternalServerErrorException(`Pi complete fetch failed: ${String(err)}`);
     }
 
@@ -158,6 +192,13 @@ export class PaymentsService {
     console.error(`[payments] complete pi response piId=${paymentId} status=${piRes.status} body=${body}`);
 
     if (!piRes.ok) {
+      recordPayment('complete', {
+        paymentId,
+        outcome: 'pi_error',
+        piStatus: piRes.status,
+        piError: body,
+        paymentVisibleToKey: await this.visibleToKey(paymentId),
+      });
       throw new InternalServerErrorException(`Pi complete failed ${piRes.status}: ${body}`);
     }
     const piData = JSON.parse(body) as {
@@ -175,6 +216,7 @@ export class PaymentsService {
       data: { status: 'COMPLETED', txid },
     });
 
+    let linked = updated.count > 0;
     if (updated.count === 0) {
       const ourId = piData.metadata?.paymentIdentifier;
       if (ourId) {
@@ -182,6 +224,7 @@ export class PaymentsService {
           where: { id: ourId, userId, status: { not: 'COMPLETED' } },
           data: { status: 'COMPLETED', txid, piPaymentId: paymentId },
         });
+        linked = recovered.count > 0;
         console.error(
           `[payments] complete recovered via metadata piId=${paymentId} ourId=${ourId} rows=${recovered.count}`,
         );
@@ -190,6 +233,7 @@ export class PaymentsService {
       }
     }
 
+    recordPayment('complete', { paymentId, outcome: 'ok', linked });
     return piData;
   }
 }

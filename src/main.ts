@@ -8,6 +8,7 @@ import { SentryExceptionFilter } from './sentry.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { isOriginAllowed } from './common/allowed-origins';
 import { piApiStatus, refreshPiApiStatusIfStale } from './common/pi-api-status';
+import { paymentDiagnostics } from './common/payment-diagnostics';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -51,7 +52,7 @@ async function bootstrap() {
     // Kicked off, never awaited — see pi-api-status.ts for why health must stay
     // instant and must not go red when Pi is unreachable.
     refreshPiApiStatusIfStale();
-    res.json({ status: 'ok', ts: Date.now(), pi_api: piApiStatus() });
+    res.json({ status: 'ok', ts: Date.now(), pi_api: piApiStatus(), payments_last: paymentDiagnostics() });
   });
 
   // Cheap unauthenticated keep-alive target. Deliberately outside the /v1
