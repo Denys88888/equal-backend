@@ -36,12 +36,12 @@
 - **App Wallets** — подключи testnet-кошелёк приложения. Тестовые π бесплатные;
   пополнить можно из Pi Wallet (Testnet).
 - **API Key** — сгенерируй ключ именно testnet-приложения.
-- **App Info → URL** и **Domain** — адрес, где будет лежать `claim.html`, и
+- **App Info → URL** и **Domain** — адрес, где будет лежать страница из `public/`, и
   верификация домена через `validation-key.txt` testnet-приложения.
 
-### 2. Страница для тестировщиков
+### 2. Страница для тестировщиков (`public/`)
 
-`claim.html` выкладывается по URL testnet-приложения рядом с его
+`public/index.html` выкладывается по URL testnet-приложения рядом с его
 `validation-key.txt`. Человек открывает её в Pi Browser, входит через Pi и
 видит свой ID с кнопкой «Скопировать».
 
@@ -101,3 +101,18 @@ Privacy Policy и Terms уже заполнены верно (`/#/privacy`, `/#/
 ```bash
 node --test
 ```
+
+## Хостинг страницы — Render Static Site
+
+Render → **New → Static Site** → репозиторий `Denys88888/equal-backend`, ветка `main`:
+
+| Поле | Значение |
+|---|---|
+| Name | `equal-testnet` |
+| Root Directory | *(пусто)* |
+| Build Command | `echo ok` |
+| Publish Directory | `tools/testnet-a2u/public` |
+
+Адрес будет `https://equal-testnet.onrender.com` (если имя занято, Render
+добавит суффикс — брать тот адрес, что он покажет). Его и ставим как URL
+Testnet-приложения в портале. Сборки нет, план бесплатный.
