@@ -1,10 +1,15 @@
-# Testnet A2U — разблокировка mainnet-кошелька Equal
+# Testnet A2U — разблокировка mainnet-кошелька Equal (только для выплат App→User)
 
-## Зачем
+## Зачем — и когда это НЕ нужно
 
-Оплата в Equal не проходит, потому что у **Mainnet-приложения нет кошелька**
-(Developer Portal → App Info → *Connected Outgoing Wallet: None*). Без него Pi
-не проводит mainnet-платежи.
+**Приём оплаты кошелёк не требует.** Оплата пользователь→приложение (билеты,
+вопросы, матчи) работает с *Connected Outgoing Wallet: None* — проверено
+реальным платежом 28.09.2026. Её единственной поломкой был API-ключ от другого
+приложения на Render (Pi отвечал `payment_not_found`).
+
+Mainnet-кошелёк нужен только для выплат **от приложения пользователям**
+(App→User: возвраты, награды). Сейчас в Equal такой функции нет. Этот
+инструмент понадобится, если она появится.
 
 Форма получения кошелька (Configuration → App Wallets) заблокирована:
 
@@ -86,15 +91,20 @@ node payout.mjs cancel <paymentId>
 ### 5. Mainnet-кошелёк
 
 После 5/5 форма в Mainnet-приложении (Configuration → App Wallets)
-разблокируется. В поле **Reason for applying** (176 из 180 символов):
+разблокируется. В поле **Reason for applying** (153 из 180 символов):
 
 ```
-Equal is a dating app on Pi Mainnet. Users pay Pi for event tickets, paid questions and extra matches. We need an app wallet to receive these payments and refund cancellations.
+Equal is a dating app on Pi Mainnet. We need an app wallet to send Pi to our users: refunds for cancelled paid events and rewards for community activity.
 ```
 
 Privacy Policy и Terms уже заполнены верно (`/#/privacy`, `/#/terms` —
 приложение на HashRouter, страницы существуют). Submit → ждать одобрения Pi.
-После подключения кошелька оплата заработает — проверь на реальном платеже.
+После подключения кошелька станут возможны выплаты App→User.
+
+**Важно:** у Testnet-приложения сейчас тот же URL, что у Mainnet
+(`equal-app.onrender.com`), а Pi пишет «A URL can only be verified for one
+app». Верификацию держит Mainnet, поэтому в Testnet никто не сможет войти, пока
+ему не дать собственный адрес — см. раздел про Render ниже.
 
 ## Тесты
 

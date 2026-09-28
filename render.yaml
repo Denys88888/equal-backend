@@ -25,8 +25,12 @@ services:
       # demotes that account on its next login.
       - key: ADMIN_PI_USERNAMES
         value: Cherry19899
+      # Set in the Render dashboard only — it must be the API key of the Equal
+      # MAINNET app. A key from any other app (the Testnet one included) is
+      # still accepted by Pi, but cannot see Equal's payments, so every approve
+      # fails with payment_not_found. /v1/health → payments_last shows this.
       - key: PI_API_KEY
-        value: h1p5wbaq0kgnnyhhpir0ngt0ozvltsifveghqfpwmxxnbau1fju0kajg0u6ferap
+        sync: false
     healthCheckPath: /v1/health
 
 databases:
