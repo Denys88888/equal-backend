@@ -48,6 +48,8 @@ model User {
   notifyMessages Boolean @default(true)
   notifyEvents   Boolean @default(true)
   notifyClubs    Boolean @default(true)
+  // Interface language, sent by the app, so push notifications arrive in it.
+  locale         String  @default("en")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

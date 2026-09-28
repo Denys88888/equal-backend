@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushService } from '../users/push.service';
+import type { PushKey } from '../common/push-texts';
 import { ProfanityService } from '../common/profanity.service';
 import { LoggerService } from '../common/logger.service';
 import { ChatGateway } from '../gateway/chat.gateway';
@@ -216,8 +217,8 @@ export class DailyMatchService {
 
     for (const uid of [userAId, userBId]) {
       this.push.sendToUser(uid, {
-        title: 'Твой Daily Match готов!',
-        body: 'Знакомься — у вас 24 часа',
+        title: 'dm_ready_title',
+        body: 'dm_ready_body',
         url: `/#/daily-match`,
         tag: 'daily-match',
       }).catch(() => {});
@@ -493,8 +494,9 @@ export class DailyMatchService {
 
     const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
     this.push.sendToUser(recipientId, {
-      title: `${sender?.name ?? 'Твой match'} написал(а)`,
-      body: clean.length > 80 ? clean.slice(0, 80) + '…' : clean,
+      title: 'dm_msg_title',
+      body: { text: clean.length > 80 ? clean.slice(0, 80) + '…' : clean },
+      params: { name: sender?.name },
       url: '/#/daily-match',
       tag: `daily-${matchId}`,
     }, 'messages').catch(() => {});
@@ -592,8 +594,8 @@ export class DailyMatchService {
         mutual++;
         for (const uid of [match.userAId, match.userBId]) {
           this.push.sendToUser(uid, {
-            title: '❤️ Match unlocked!',
-            body: 'Чат открыт навсегда',
+            title: 'dm_unlocked_title',
+            body: 'dm_unlocked_body',
             url: '/#/daily-match',
             tag: 'daily-match',
           }, 'matches').catch(() => {});
@@ -608,8 +610,8 @@ export class DailyMatchService {
         expired++;
         for (const uid of [match.userAId, match.userBId]) {
           this.push.sendToUser(uid, {
-            title: '💔 Match expired',
-            body: 'Новый match завтра',
+            title: 'dm_expired_title',
+            body: 'dm_expired_body',
             url: '/#/daily-match',
             tag: 'daily-match',
           }).catch(() => {});
@@ -648,8 +650,8 @@ export class DailyMatchService {
   async sendReminders(
     now: Date,
     offsetMinutes: number,
-    title: string,
-    body: string,
+    title: PushKey,
+    body: PushKey,
     windowMinutes = 5,
   ) {
     const users = await this.prisma.user.findMany({
@@ -698,8 +700,9 @@ export class DailyMatchService {
       for (const uid of [match.userAId, match.userBId]) {
         if (wrote.has(uid)) continue;
         this.push.sendToUser(uid, {
-          title: 'Ты ещё не написал(а) своему match',
-          body: `Осталось ${hoursLeft} ч.`,
+          title: 'dm_nudge_title',
+          body: 'dm_nudge_body',
+          params: { hours: hoursLeft },
           url: '/#/daily-match',
           tag: 'daily-match',
         }).catch(() => {});

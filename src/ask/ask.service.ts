@@ -327,8 +327,8 @@ export class AskService {
     // Best effort: a dead push subscription must not fail the question.
     this.push
       .sendToUser(target.id, {
-        title: 'New question! 💜',
-        body: 'Someone wants to know you better',
+        title: 'ask_new_title',
+        body: 'ask_new_body',
         // Hash-prefixed: the client is a HashRouter, so a bare path would land
         // on the server's index instead of the route.
         url: '/#/my-asks',
@@ -375,8 +375,9 @@ export class AskService {
       });
       this.push
         .sendToUser(question.askerId, {
-          title: 'Your question got an answer! 🎉',
-          body: `${me?.name ?? 'Someone'} replied to your question`,
+          title: 'ask_answer_title',
+          body: 'ask_answer_body',
+          params: { name: me?.name },
           url: me?.username ? `/#/u/${encodeURIComponent(me.username)}` : '/#/my-asks',
           tag: `ask-answer-${questionId}`,
         })

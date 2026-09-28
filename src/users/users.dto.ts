@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { PUSH_LOCALES } from '../common/push-texts';
 
 /**
  * Settings → Privacy / Notifications. Every field is optional so the app can
@@ -12,6 +13,8 @@ export class UpdateSettingsDto {
   @IsOptional() @IsBoolean() notifyMessages?: boolean;
   @IsOptional() @IsBoolean() notifyEvents?: boolean;
   @IsOptional() @IsBoolean() notifyClubs?: boolean;
+  /** The app's interface language; push notifications are written in it. */
+  @IsOptional() @IsIn(PUSH_LOCALES) locale?: string;
 }
 
 export const SETTINGS_SELECT = {

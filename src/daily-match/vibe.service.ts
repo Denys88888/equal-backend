@@ -63,8 +63,8 @@ export class VibeService {
     for (const u of users) {
       if (!isDue(now, u.timezone, '10:00')) continue;
       this.push.sendToUser(u.id, {
-        title: 'Какой у тебя настрой сегодня?',
-        body: 'Выбери вайб — подберём match под него',
+        title: 'vibe_title',
+        body: 'vibe_body',
         url: '/#/daily-match',
         tag: 'vibe-check',
       }).catch(() => {});

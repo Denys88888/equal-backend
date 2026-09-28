@@ -45,8 +45,8 @@ export class DailyMatchCron {
     try {
       await this.matches.sendReminders(
         new Date(), 5,
-        '🔔 Daily Match через 5 минут',
-        'Скоро познакомишься с новым человеком',
+        'dm_soon_title',
+        'dm_soon_body',
       );
     } catch (err) {
       this.logger.error('pre-match reminder failed', { err: String(err) });

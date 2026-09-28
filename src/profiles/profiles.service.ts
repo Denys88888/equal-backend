@@ -342,8 +342,9 @@ export class ProfilesService {
           // Push notification (fire-and-forget)
           const swiper = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
           this.push.sendToUser(targetUserId, {
-            title: "It's a Match! 💜",
-            body: `You and ${swiper?.name || 'Someone'} liked each other!`,
+            title: 'match_title',
+            body: 'match_body',
+            params: { name: swiper?.name },
             url: `/#/matches`,
             tag: `match-${match.id}`,
           }, 'matches').catch(() => {});

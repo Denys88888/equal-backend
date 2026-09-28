@@ -38,7 +38,7 @@ describe('UsersService.updateSettings', () => {
 
   beforeEach(() => update.mockClear());
 
-  it('writes only the six setting columns, never anything else in the body', async () => {
+  it('writes only the setting columns, never anything else in the body', async () => {
     await service.updateSettings('u1', {
       ghostMode: true,
       notifyClubs: false,
@@ -54,8 +54,18 @@ describe('UsersService.updateSettings', () => {
     expect(where).toEqual({ id: 'u1' });
     expect(data).toEqual({ ghostMode: true, notifyClubs: false });
     expect(Object.keys(select).sort()).toEqual(
-      ['ghostMode', 'notifyClubs', 'notifyEvents', 'notifyMatches', 'notifyMessages', 'verifiedOnly'],
+      ['ghostMode', 'locale', 'notifyClubs', 'notifyEvents', 'notifyMatches', 'notifyMessages', 'verifiedOnly'],
     );
+  });
+
+  it('saves the interface language used for push notifications', async () => {
+    await service.updateSettings('u1', { locale: 'ru' });
+    expect((update.mock.calls[0][0] as unknown as { data: object }).data).toEqual({ locale: 'ru' });
+  });
+
+  it('rejects a language the app does not ship', async () => {
+    expect(await errorsFor({ locale: 'klingon' })).not.toHaveLength(0);
+    expect(await errorsFor({ locale: 'fil' })).toHaveLength(0);
   });
 
   it('ignores non-boolean values instead of coercing them', async () => {

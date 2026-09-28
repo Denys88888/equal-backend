@@ -226,11 +226,16 @@ export class UsersService {
 
   /** Privacy + notification toggles from Settings; returns the saved values. */
   async updateSettings(userId: string, data: UpdateSettingsDto) {
-    const patch: Record<string, boolean> = {};
+    const patch: Record<string, boolean | string> = {};
     for (const key of Object.keys(SETTINGS_SELECT) as (keyof UpdateSettingsDto)[]) {
       if (typeof data[key] === 'boolean') patch[key] = data[key] as boolean;
     }
-    return this.prisma.user.update({ where: { id: userId }, data: patch, select: SETTINGS_SELECT });
+    if (typeof data.locale === 'string') patch.locale = data.locale;
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: patch,
+      select: { ...SETTINGS_SELECT, locale: true },
+    });
   }
 
   async updateMatchPrefs(
