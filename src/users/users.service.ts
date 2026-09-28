@@ -192,6 +192,38 @@ export class UsersService {
   }
 
   /** Daily Match delivery preferences (timezone, local time, languages). */
+  /**
+   * Which Profile badges the user has earned, from what they actually did.
+   * The badges described automatic goals ("Join 3+ clubs", "Send 50
+   * messages", "Attend 2 events"…) but only lit up when an admin happened to
+   * award a badge string containing a matching word, so nobody ever earned
+   * one by doing the thing.
+   */
+  async getAchievements(userId: string) {
+    const now = new Date();
+    const [user, profile, clubs, greatEvents, sparksSent, messages, dailyMessages, attended] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId }, select: { verified: true, trustScore: true } }),
+      this.prisma.profile.findUnique({ where: { userId }, select: { profileComplete: true } }),
+      this.prisma.clubMember.count({ where: { userId } }),
+      this.prisma.eventFeedback.count({ where: { userId, rating: 'great' } }),
+      this.prisma.swipeAction.count({ where: { userId, action: 'spark' } }),
+      this.prisma.message.count({ where: { senderId: userId } }),
+      this.prisma.dailyMatchMessage.count({ where: { senderId: userId } }),
+      this.prisma.eventRsvp.count({ where: { userId, status: 'GOING', event: { date: { lt: now } } } }),
+    ]);
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      verified: user.verified,
+      party: clubs >= 3,
+      pro: greatEvents >= 3,
+      spark: sparksSent >= 10,
+      chatty: messages + dailyMessages >= 50,
+      event: attended >= 2,
+      profile: !!profile?.profileComplete,
+      trust: user.trustScore > 80,
+    };
+  }
+
   /** Privacy + notification toggles from Settings; returns the saved values. */
   async updateSettings(userId: string, data: UpdateSettingsDto) {
     const patch: Record<string, boolean> = {};

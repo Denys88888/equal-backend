@@ -4,6 +4,7 @@ import { DailyMatchService } from './daily-match/daily-match.service';
 import { EventsService } from './events/events.service';
 import { AdminService, WARN_TRUST_PENALTY } from './admin/admin.service';
 import { VerificationService } from './verification/verification.service';
+import { UsersService } from './users/users.service';
 
 /**
  * Regression tests for the 2026-09-28 QA pass: each block is a defect that was
@@ -195,5 +196,47 @@ describe('VerificationService.review', () => {
     await service.review('v1', true);
     expect(prisma.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { verified: true } });
     expect(onVerificationChanged).toHaveBeenCalledWith('u1', false, true);
+  });
+});
+
+// ── Profile badges from real activity ──────────────────────────────────────
+
+describe('UsersService.getAchievements', () => {
+  function users(counts: { clubs: number; great: number; sparks: number; messages: number; daily: number; attended: number },
+    user = { verified: true, trustScore: 81 }, complete = true) {
+    const prisma = {
+      user: { findUnique: vi.fn().mockResolvedValue(user) },
+      profile: { findUnique: vi.fn().mockResolvedValue({ profileComplete: complete }) },
+      clubMember: { count: vi.fn().mockResolvedValue(counts.clubs) },
+      eventFeedback: { count: vi.fn().mockResolvedValue(counts.great) },
+      swipeAction: { count: vi.fn().mockResolvedValue(counts.sparks) },
+      message: { count: vi.fn().mockResolvedValue(counts.messages) },
+      dailyMatchMessage: { count: vi.fn().mockResolvedValue(counts.daily) },
+      eventRsvp: { count: vi.fn().mockResolvedValue(counts.attended) },
+    };
+    return { service: new UsersService(prisma as never, {} as never), prisma };
+  }
+
+  it('earns each badge exactly at its threshold', async () => {
+    const { service } = users({ clubs: 3, great: 3, sparks: 10, messages: 40, daily: 10, attended: 2 });
+    await expect(service.getAchievements('u1')).resolves.toEqual({
+      verified: true, party: true, pro: true, spark: true, chatty: true, event: true, profile: true, trust: true,
+    });
+  });
+
+  it('earns nothing one short of each threshold', async () => {
+    const { service } = users({ clubs: 2, great: 2, sparks: 9, messages: 49, daily: 0, attended: 1 },
+      { verified: false, trustScore: 80 }, false);
+    await expect(service.getAchievements('u1')).resolves.toEqual({
+      verified: false, party: false, pro: false, spark: false, chatty: false, event: false, profile: false, trust: false,
+    });
+  });
+
+  it('counts only events that are over', async () => {
+    const { service, prisma } = users({ clubs: 0, great: 0, sparks: 0, messages: 0, daily: 0, attended: 0 });
+    await service.getAchievements('u1');
+    const where = prisma.eventRsvp.count.mock.calls[0][0].where;
+    expect(where).toMatchObject({ userId: 'u1', status: 'GOING' });
+    expect(where.event.date.lt).toBeInstanceOf(Date);
   });
 });

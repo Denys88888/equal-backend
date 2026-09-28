@@ -29,6 +29,12 @@ export class UsersController {
     return this.usersService.update(req.user.id, body);
   }
 
+  /** Badges earned from real activity (Profile → Badges). */
+  @Get('me/achievements')
+  async getAchievements(@Request() req: { user: { id: string } }) {
+    return this.usersService.getAchievements(req.user.id);
+  }
+
   /** Settings → Privacy / Notifications toggles. */
   @Patch('me/settings')
   async updateSettings(@Request() req: { user: { id: string } }, @Body() body: UpdateSettingsDto) {
