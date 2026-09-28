@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
+import { CreateClubDto } from './clubs.dto';
 
 @Injectable()
 export class ClubsService {
@@ -44,9 +45,17 @@ export class ClubsService {
     }));
   }
 
-  async create(data: { name: string; description?: string; category: string }, creatorId: string) {
+  async create(data: CreateClubDto, creatorId: string) {
+    // Explicit fields, never a spread of the request body: anything the client
+    // adds (memberCount, icon, id, createdAt) must not reach the row.
     const club = await this.prisma.club.create({
-      data: { ...data, createdBy: creatorId, status: 'PENDING' },
+      data: {
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        category: data.category,
+        createdBy: creatorId,
+        status: 'PENDING',
+      },
     });
     // Creator auto-joins their own (pending) club as its admin
     await this.prisma.clubMember.create({

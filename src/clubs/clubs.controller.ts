@@ -5,6 +5,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ClubsService } from './clubs.service';
 import { UploadService } from '../upload/upload.service';
+import { CreateClubDto, PostContentDto, TextContentDto } from './clubs.dto';
 
 @ApiTags('Clubs')
 @Controller('clubs')
@@ -30,7 +31,7 @@ export class ClubsController {
   @Post()
   async createClub(
     @Request() req: { user: { id: string } },
-    @Body() body: { name: string; description?: string; category: string },
+    @Body() body: CreateClubDto,
   ) {
     return this.clubsService.create(body, req.user.id);
   }
@@ -64,7 +65,7 @@ export class ClubsController {
   async createPost(
     @Request() req: { user: { id: string } },
     @Param('id') clubId: string,
-    @Body() body: { content: string },
+    @Body() body: PostContentDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     let imageUrl: string | undefined;
@@ -113,7 +114,7 @@ export class ClubsController {
   async createComment(
     @Request() req: { user: { id: string } },
     @Param('postId') postId: string,
-    @Body() body: { content: string },
+    @Body() body: TextContentDto,
   ) {
     return this.clubsService.createComment(postId, req.user.id, body.content);
   }
@@ -131,7 +132,7 @@ export class ClubsController {
   async sendMessage(
     @Request() req: { user: { id: string } },
     @Param('id') clubId: string,
-    @Body() body: { content: string },
+    @Body() body: TextContentDto,
   ) {
     return this.clubsService.createMessage(clubId, req.user.id, body.content);
   }
