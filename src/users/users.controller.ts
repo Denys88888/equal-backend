@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { UploadService } from '../upload/upload.service';
 import { PushService } from './push.service';
+import { UpdateSettingsDto } from './users.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -26,6 +27,12 @@ export class UsersController {
   @Patch('me')
   async updateMe(@Request() req: { user: { id: string } }, @Body() body: Record<string, unknown>) {
     return this.usersService.update(req.user.id, body);
+  }
+
+  /** Settings → Privacy / Notifications toggles. */
+  @Patch('me/settings')
+  async updateSettings(@Request() req: { user: { id: string } }, @Body() body: UpdateSettingsDto) {
+    return this.usersService.updateSettings(req.user.id, body);
   }
 
   @Post('me/push-subscription')

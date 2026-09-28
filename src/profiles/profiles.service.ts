@@ -75,6 +75,7 @@ export class ProfilesService {
       where: {
         id: { notIn: excludeIds },
         isActive: true,
+        ghostMode: false,
         ...(filters.verifiedOnly === 'true' ? { verified: true } : {}),
         ...(Object.keys(birthDateFilter).length
           ? { profile: { birthDate: birthDateFilter } }
@@ -357,7 +358,7 @@ export class ProfilesService {
             body: `You and ${swiper?.name || 'Someone'} liked each other!`,
             url: `/#/matches`,
             tag: `match-${match.id}`,
-          }).catch(() => {});
+          }, 'matches').catch(() => {});
 
           return { success: true, isMatch: true, matchId: match.id, sparkBalance };
         }

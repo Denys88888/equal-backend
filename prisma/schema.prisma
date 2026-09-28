@@ -37,6 +37,18 @@ model User {
   dailyVibe String?
   vibeUpdatedAt DateTime?
 
+  // Settings screen. These were local React state that reset on every visit
+  // and changed nothing — Ghost Mode claimed to hide the profile and did not.
+  // ghostMode keeps the user out of Discover and Daily Match pairing; existing
+  // matches and chats are untouched. verifiedOnly is the user's default for
+  // Discover's own filter. notify* gate push notifications by category.
+  ghostMode      Boolean @default(false)
+  verifiedOnly   Boolean @default(false)
+  notifyMatches  Boolean @default(true)
+  notifyMessages Boolean @default(true)
+  notifyEvents   Boolean @default(true)
+  notifyClubs    Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

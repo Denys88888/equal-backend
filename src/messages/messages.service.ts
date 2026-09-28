@@ -149,7 +149,7 @@ export class MessagesService {
       body: preview,
       url: `/#/chat/${matchId}`,
       tag: `msg-${matchId}`,
-    }).catch(() => {});
+    }, 'messages').catch(() => {});
 
     return message;
   }

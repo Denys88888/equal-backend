@@ -121,6 +121,7 @@ export class DailyMatchService {
     const users = await this.prisma.user.findMany({
       where: {
         isActive: true,
+        ghostMode: false,
         voiceIntroUrl: { not: null },
         OR: [{ bannedUntil: null }, { bannedUntil: { lt: now } }],
       },
@@ -460,7 +461,7 @@ export class DailyMatchService {
       body: clean.length > 80 ? clean.slice(0, 80) + '…' : clean,
       url: '/#/daily-match',
       tag: `daily-${matchId}`,
-    }).catch(() => {});
+    }, 'messages').catch(() => {});
 
     return message;
   }
@@ -559,7 +560,7 @@ export class DailyMatchService {
             body: 'Чат открыт навсегда',
             url: '/#/daily-match',
             tag: 'daily-match',
-          }).catch(() => {});
+          }, 'matches').catch(() => {});
         }
       } else {
         await this.prisma.dailyMatch.update({ where: { id: match.id }, data: { status: 'EXPIRED' } });

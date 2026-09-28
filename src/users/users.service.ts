@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SETTINGS_SELECT, UpdateSettingsDto } from './users.dto';
 
 const ALLOWED_USER_FIELDS = ['name', 'avatar'];
 const ALLOWED_PROFILE_FIELDS = ['bio', 'birthDate', 'city', 'latitude', 'longitude', 'gender', 'lookingFor', 'goals', 'interests'];
@@ -180,6 +181,15 @@ export class UsersService {
   }
 
   /** Daily Match delivery preferences (timezone, local time, languages). */
+  /** Privacy + notification toggles from Settings; returns the saved values. */
+  async updateSettings(userId: string, data: UpdateSettingsDto) {
+    const patch: Record<string, boolean> = {};
+    for (const key of Object.keys(SETTINGS_SELECT) as (keyof UpdateSettingsDto)[]) {
+      if (typeof data[key] === 'boolean') patch[key] = data[key] as boolean;
+    }
+    return this.prisma.user.update({ where: { id: userId }, data: patch, select: SETTINGS_SELECT });
+  }
+
   async updateMatchPrefs(
     userId: string,
     data: { timezone?: string; dailyMatchTime?: string; languages?: string[] },
