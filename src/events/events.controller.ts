@@ -3,7 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { EventsService } from './events.service';
-import { CreateEventDto } from './events.dto';
+import { CreateEventDto, EventFeedbackDto } from './events.dto';
 
 @ApiTags('Events')
 @Controller('events')
@@ -41,5 +41,17 @@ export class EventsController {
     @Body() body: { status: string },
   ) {
     return this.eventsService.rsvp(eventId, req.user.id, body.status);
+  }
+
+  /** "How was the event?" — only from someone who was going, only afterwards. */
+  @Post(':id/feedback')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async feedback(
+    @Request() req: { user: { id: string } },
+    @Param('id') eventId: string,
+    @Body() dto: EventFeedbackDto,
+  ) {
+    return this.eventsService.submitFeedback(eventId, req.user.id, dto.rating);
   }
 }

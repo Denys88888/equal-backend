@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SETTINGS_SELECT, UpdateSettingsDto } from './users.dto';
+import { RewardsService } from '../sparks/rewards.service';
 
 const ALLOWED_USER_FIELDS = ['name', 'avatar'];
 const ALLOWED_PROFILE_FIELDS = ['bio', 'birthDate', 'city', 'latitude', 'longitude', 'gender', 'lookingFor', 'goals', 'interests'];
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private rewards: RewardsService,
+  ) {}
 
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
@@ -15,7 +19,10 @@ export class UsersService {
       include: { profile: true, photos: { orderBy: { order: 'asc' } } },
     });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+    // Server-side plumbing the app never needs: the (unused) password hash and
+    // the raw Web Push endpoint + keys.
+    const { password: _password, pushSubscription: _push, ...visible } = user;
+    return visible;
   }
 
   async update(id: string, data: Record<string, unknown>) {
@@ -50,6 +57,7 @@ export class UsersService {
         update: profileData,
         create: { userId: id, ...profileData },
       });
+      await this.rewards.refreshProfileCompletion(id);
     }
 
     if (Object.keys(userData).length === 0 && Object.keys(profileData).length === 0) {
@@ -68,9 +76,11 @@ export class UsersService {
     if (isMain) {
       await this.prisma.photo.updateMany({ where: { userId }, data: { isMain: false } });
     }
-    return this.prisma.photo.create({
+    const photo = await this.prisma.photo.create({
       data: { userId, url, isMain, order: count },
     });
+    await this.rewards.refreshProfileCompletion(userId);
+    return photo;
   }
 
   async deletePhoto(userId: string, photoId: string) {
@@ -88,6 +98,7 @@ export class UsersService {
       });
       if (next) await this.prisma.photo.update({ where: { id: next.id }, data: { isMain: true } });
     }
+    await this.rewards.refreshProfileCompletion(userId);
     return { success: true };
   }
 

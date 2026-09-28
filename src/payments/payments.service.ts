@@ -157,6 +157,81 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * Hourly sweep of payments stuck in PENDING/APPROVED. Before this, a payment
+   * the user abandoned (or one made while the wrong API key was deployed) sat
+   * in Payment History as PENDING forever.
+   *
+   * Deliberately conservative, because a wrong CANCELLED hides real money:
+   * - never linked to a Pi payment after an hour → CANCELLED. Linking happens
+   *   in approve(), and Pi lets no money move before approval, so nothing was
+   *   paid. (If Pi somehow completes it later, complete() still upgrades it.)
+   * - Pi says cancelled → CANCELLED.
+   * - Pi says developer_completed → COMPLETED (our complete call was lost).
+   * - transaction verified on chain but never completed → complete it now,
+   *   exactly as the app would have.
+   * - Pi answers 404 → left alone: that is what a misconfigured key looks
+   *   like, and it says nothing about the payment itself.
+   */
+  async reconcileStale(now = new Date()) {
+    const summary = { cancelled: 0, completed: 0, untouched: 0 };
+    const stale = await this.prisma.payment.findMany({
+      where: { status: { in: ['PENDING', 'APPROVED'] }, createdAt: { lt: new Date(now.getTime() - 60 * 60 * 1000) } },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+
+    const settle = async (id: string, data: { status: 'CANCELLED' | 'COMPLETED'; txid?: string }) => {
+      // Conditional, so a complete() racing this sweep is never overwritten.
+      const res = await this.prisma.payment.updateMany({
+        where: { id, status: { in: ['PENDING', 'APPROVED'] } },
+        data,
+      });
+      if (res.count > 0) summary[data.status === 'CANCELLED' ? 'cancelled' : 'completed']++;
+    };
+
+    for (const p of stale) {
+      if (!p.piPaymentId) {
+        await settle(p.id, { status: 'CANCELLED' });
+        continue;
+      }
+      try {
+        const res = await this.piApiFetch(`${PI_API_BASE}/payments/${p.piPaymentId}`, {
+          headers: { Authorization: `Key ${this.apiKey}` },
+        });
+        if (!res.ok) { summary.untouched++; continue; }
+        const pi = (await res.json()) as {
+          status?: { developer_completed?: boolean; transaction_verified?: boolean; cancelled?: boolean; user_cancelled?: boolean };
+          transaction?: { txid?: string } | null;
+        };
+        const st = pi.status ?? {};
+        const txid = pi.transaction?.txid;
+        if (st.cancelled || st.user_cancelled) {
+          await settle(p.id, { status: 'CANCELLED' });
+        } else if (st.developer_completed) {
+          await settle(p.id, { status: 'COMPLETED', ...(txid && { txid }) });
+        } else if (st.transaction_verified && txid) {
+          const done = await this.piApiFetch(`${PI_API_BASE}/payments/${p.piPaymentId}/complete`, {
+            method: 'POST',
+            headers: { Authorization: `Key ${this.apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ txid }),
+          });
+          if (done.ok) await settle(p.id, { status: 'COMPLETED', txid });
+          else summary.untouched++;
+        } else {
+          summary.untouched++; // still waiting on the user; Pi will cancel it eventually
+        }
+      } catch (err) {
+        console.error(`[payments] reconcile failed id=${p.id}`, err);
+        summary.untouched++;
+      }
+    }
+    if (summary.cancelled || summary.completed) {
+      console.error(`[payments] reconcile ${JSON.stringify(summary)}`);
+    }
+    return summary;
+  }
+
   async complete(userId: string, paymentId: string, txid: string) {
     console.error(`[payments] complete start piId=${paymentId} txid=${txid}`);
 

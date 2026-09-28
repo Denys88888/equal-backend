@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadService } from '../upload/upload.service';
+import { RewardsService } from '../sparks/rewards.service';
 
 const GESTURES = ['blink', 'smile', 'turn_left', 'turn_right'];
 
@@ -9,6 +10,7 @@ export class VerificationService {
   constructor(
     private prisma: PrismaService,
     private upload: UploadService,
+    private rewards: RewardsService,
   ) {}
 
   /**
@@ -78,18 +80,20 @@ export class VerificationService {
     if (!req) throw new NotFoundException('Request not found');
     if (req.status !== 'PENDING') throw new BadRequestException('Already reviewed');
 
-    // Approving is the only path that sets User.verified, which in turn is what
-    // the `verification` spark reward and the verifiedOnly filter check.
+    // Approving is the only path that sets User.verified. Rejecting a new
+    // selfie used to set it to false too, silently un-verifying someone who
+    // was already verified and merely re-submitted; a rejection now only
+    // closes the request.
+    const user = await this.prisma.user.findUnique({ where: { id: req.userId }, select: { verified: true } });
+    const wasVerified = !!user?.verified;
     const [updated] = await this.prisma.$transaction([
       this.prisma.verificationRequest.update({
         where: { id: requestId },
         data: { status: approve ? 'APPROVED' : 'REJECTED', reviewedAt: new Date() },
       }),
-      this.prisma.user.update({
-        where: { id: req.userId },
-        data: { verified: approve },
-      }),
+      ...(approve ? [this.prisma.user.update({ where: { id: req.userId }, data: { verified: true } })] : []),
     ]);
+    await this.rewards.onVerificationChanged(req.userId, wasVerified, wasVerified || approve);
     return { success: true, status: updated.status };
   }
 }

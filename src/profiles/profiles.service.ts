@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { PushService } from '../users/push.service';
+import { RewardsService } from '../sparks/rewards.service';
 
 @Injectable()
 export class ProfilesService {
@@ -9,6 +10,7 @@ export class ProfilesService {
     private prisma: PrismaService,
     private gateway: ChatGateway,
     private push: PushService,
+    private rewards: RewardsService,
   ) {}
 
   async getProfile(userId: string) {
@@ -245,22 +247,8 @@ export class ProfilesService {
       create: { userId, ...profileData },
     });
 
-    // Recompute completeness so the profile_complete reward has something to verify
-    const photoCount = await this.prisma.photo.count({ where: { userId } });
-    const checks = [
-      !!saved.bio,
-      !!saved.birthDate,
-      !!saved.city,
-      !!saved.gender,
-      saved.interests.length >= 3,
-      saved.goals.length > 0,
-      photoCount > 0,
-    ];
-    const completionPercent = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-    return this.prisma.profile.update({
-      where: { userId },
-      data: { completionPercent, profileComplete: completionPercent === 100 },
-    });
+    // Also grants the complete_profile sparks the first time it reaches 100%.
+    return (await this.rewards.refreshProfileCompletion(userId)) ?? saved;
   }
 
   async swipe(userId: string, targetUserId: string, action: string) {

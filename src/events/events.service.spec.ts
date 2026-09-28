@@ -51,7 +51,7 @@ describe('EventsService — paid-ticket gate', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    service = new EventsService(prisma as never);
+    service = new EventsService(prisma as never, {} as never);
   });
 
   it('404s for an event that does not exist', async () => {
@@ -129,7 +129,7 @@ describe('EventsService — capacity', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    service = new EventsService(prisma as never);
+    service = new EventsService(prisma as never, {} as never);
   });
 
   it('refuses a new attendee once the event is full', async () => {
@@ -185,7 +185,7 @@ describe('EventsService — reading back my own RSVP', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    service = new EventsService(prisma as never);
+    service = new EventsService(prisma as never, {} as never);
   });
 
   it('reports the caller their own status so a paid ticket survives a reload', async () => {
@@ -260,7 +260,7 @@ describe('EventsService — events proposed by users', () => {
 
   beforeEach(() => {
     prisma = makePrisma();
-    service = new EventsService(prisma as never);
+    service = new EventsService(prisma as never, {} as never);
   });
 
   it('creates the event PENDING, free and owned by the caller', async () => {

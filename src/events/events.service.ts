@@ -1,13 +1,17 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './events.dto';
+import { RewardsService } from '../sparks/rewards.service';
 
 /** How many of a user's events may wait for review at once — a cap on spam, not on activity. */
 export const MAX_PENDING_EVENTS_PER_USER = 3;
 
 @Injectable()
 export class EventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private rewards: RewardsService,
+  ) {}
 
   /**
    * Attach the caller's own RSVP status. Without this the client has no way to
@@ -15,9 +19,9 @@ export class EventsService {
    * an empty "going" set, so after a reload a paid ticket looked unbought and
    * the Buy button came back — offering to charge for it a second time.
    */
-  private withMyRsvp<T extends { rsvps?: { status: string }[] }>(event: T) {
-    const { rsvps, ...rest } = event;
-    return { ...rest, myRsvpStatus: rsvps?.[0]?.status ?? null };
+  private withMyRsvp<T extends { rsvps?: { status: string }[]; feedback?: { rating: string }[] }>(event: T) {
+    const { rsvps, feedback, ...rest } = event;
+    return { ...rest, myRsvpStatus: rsvps?.[0]?.status ?? null, myFeedback: feedback?.[0]?.rating ?? null };
   }
 
   async getOne(eventId: string, userId?: string) {
@@ -25,7 +29,12 @@ export class EventsService {
       where: { id: eventId },
       include: {
         _count: { select: { rsvps: true } },
-        ...(userId ? { rsvps: { where: { userId }, select: { status: true } } } : {}),
+        ...(userId
+          ? {
+              rsvps: { where: { userId }, select: { status: true } },
+              feedback: { where: { userId }, select: { rating: true } },
+            }
+          : {}),
       },
     });
     if (!event) return event;
@@ -42,7 +51,12 @@ export class EventsService {
       orderBy: { date: 'asc' },
       include: {
         _count: { select: { rsvps: true } },
-        ...(userId ? { rsvps: { where: { userId }, select: { status: true } } } : {}),
+        ...(userId
+          ? {
+              rsvps: { where: { userId }, select: { status: true } },
+              feedback: { where: { userId }, select: { rating: true } },
+            }
+          : {}),
       },
     });
     return events.map((e) => this.withMyRsvp(e));
@@ -52,11 +66,16 @@ export class EventsService {
     const normalizedStatus = status.toUpperCase() as 'GOING' | 'INTERESTED' | 'NOT_GOING';
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
-      select: { price: true, maxAttendees: true, status: true, _count: { select: { rsvps: true } } },
+      select: { price: true, maxAttendees: true, status: true, date: true, _count: { select: { rsvps: true } } },
     });
     // A pending event is invisible, so it must also be unbookable — otherwise its
     // id alone would let people RSVP to something an admin never approved.
     if (!event || event.status !== 'ACTIVE') throw new NotFoundException('Event not found');
+    // Signing up for (or paying for) something that already happened is never
+    // intended; withdrawing is still allowed.
+    if (normalizedStatus !== 'NOT_GOING' && event.date && event.date.getTime() < Date.now()) {
+      throw new BadRequestException('This event has already taken place');
+    }
 
     if (normalizedStatus === 'GOING') {
       // Capacity — the UI advertises maxAttendees but nothing enforced it
@@ -129,5 +148,29 @@ export class EventsService {
         createdBy: userId,
       },
     });
+  }
+
+  /**
+   * Stores "How was the event?". Only someone who was going may answer, and
+   * only once the event is over — the sheet used to ask before it had even
+   * started and then threw the answer away. The first answer per event earns
+   * the date_feedback sparks; changing it later does not earn again.
+   */
+  async submitFeedback(eventId: string, userId: string, rating: string) {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { date: true, status: true } });
+    if (!event || event.status !== 'ACTIVE') throw new NotFoundException('Event not found');
+    if (event.date.getTime() > Date.now()) throw new BadRequestException('The event has not happened yet');
+
+    const rsvp = await this.prisma.eventRsvp.findUnique({ where: { eventId_userId: { eventId, userId } } });
+    if (rsvp?.status !== 'GOING') throw new BadRequestException('Only attendees can leave feedback');
+
+    const existing = await this.prisma.eventFeedback.findUnique({ where: { eventId_userId: { eventId, userId } } });
+    const saved = await this.prisma.eventFeedback.upsert({
+      where: { eventId_userId: { eventId, userId } },
+      update: { rating },
+      create: { eventId, userId, rating },
+    });
+    if (!existing) await this.rewards.award(userId, 'date_feedback');
+    return { success: true, rating: saved.rating };
   }
 }

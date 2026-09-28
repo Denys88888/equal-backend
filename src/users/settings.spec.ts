@@ -34,7 +34,7 @@ describe('UpdateSettingsDto', () => {
 
 describe('UsersService.updateSettings', () => {
   const update = vi.fn().mockResolvedValue({});
-  const service = new UsersService({ user: { update } } as never);
+  const service = new UsersService({ user: { update } } as never, {} as never);
 
   beforeEach(() => update.mockClear());
 
@@ -72,7 +72,7 @@ describe('ProfilesService.discover — Ghost Mode', () => {
       profile: { findUnique: vi.fn().mockResolvedValue(null) },
       user: { findMany: userFindMany },
     };
-    const service = new ProfilesService(prisma as never, {} as never, {} as never);
+    const service = new ProfilesService(prisma as never, {} as never, {} as never, {} as never);
 
     await service.discover('me', {});
 

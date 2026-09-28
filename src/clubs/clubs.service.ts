@@ -2,12 +2,14 @@ import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { CreateClubDto } from './clubs.dto';
+import { RewardsService } from '../sparks/rewards.service';
 
 @Injectable()
 export class ClubsService {
   constructor(
     private prisma: PrismaService,
     private gateway: ChatGateway,
+    private rewards: RewardsService,
   ) {}
 
   async getOne(clubId: string) {
@@ -135,9 +137,11 @@ export class ClubsService {
     await this.assertMember(clubId, authorId);
     const trimmed = (content ?? '').trim();
     if (!trimmed && !image) throw new ForbiddenException('Post needs text or a photo');
-    return this.prisma.clubPost.create({
+    const post = await this.prisma.clubPost.create({
       data: { clubId, authorId, content: trimmed, image },
     });
+    await this.rewards.award(authorId, 'club_activity');
+    return post;
   }
 
   // ── Post comments ───────────────────────────────────────

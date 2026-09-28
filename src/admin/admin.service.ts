@@ -1,9 +1,16 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RewardsService } from '../sparks/rewards.service';
+
+/** Trust taken from a reported user when a moderator issues a warning. */
+export const WARN_TRUST_PENALTY = 10;
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private rewards: RewardsService,
+  ) {}
 
   async getStats() {
     const startOfDay = new Date();
@@ -131,9 +138,10 @@ export class AdminService {
   }
 
   async setVerified(userId: string, verified: boolean) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { verified: true } });
     if (!user) throw new NotFoundException('User not found');
     await this.prisma.user.update({ where: { id: userId }, data: { verified } });
+    await this.rewards.onVerificationChanged(userId, user.verified, verified);
     return { success: true, verified };
   }
 
@@ -263,14 +271,16 @@ export class AdminService {
     const report = await this.prisma.report.findUnique({ where: { id: reportId } });
     if (!report) throw new NotFoundException('Report not found');
 
-    // 'ban' and 'warn' act on the reported user as well as closing the report
-    if (action === 'ban') {
-      await this.prisma.user.updateMany({ where: { id: report.targetId }, data: { isActive: false } });
-    } else if (action === 'warn') {
-      await this.prisma.user.updateMany({
-        where: { id: report.targetId },
-        data: { trustScore: { decrement: 10 } },
-      });
+    // 'ban' and 'warn' act on the reported user as well as closing the report —
+    // once. Re-resolving an already handled report used to take another 10
+    // trust each time, and the decrement could go below 0 and left the
+    // Profile copy of the score behind.
+    if (report.status === 'PENDING') {
+      if (action === 'ban') {
+        await this.prisma.user.updateMany({ where: { id: report.targetId }, data: { isActive: false } });
+      } else if (action === 'warn') {
+        await this.rewards.adjustTrust(report.targetId, -WARN_TRUST_PENALTY);
+      }
     }
 
     await this.prisma.report.update({ where: { id: reportId }, data: { status: status as any } });

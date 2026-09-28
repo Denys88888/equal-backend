@@ -226,36 +226,24 @@ export class DailyMatchService {
   }
 
   /**
-   * Paid extra match (0.2 Pi) — bypasses the once-a-day rule.
-   *
-   * The payment is verified here rather than trusted from the client: the
-   * caller must have a COMPLETED, not-yet-consumed payment with the extra-match
-   * memo, and it is marked consumed before the match is created so the same
-   * payment can't be replayed.
+   * Who an extra match would pair the caller with right now, or why nobody.
+   * Shared by the pre-payment status check and the claim itself, so the app
+   * can refuse to take 0.2 Pi for a match that cannot be delivered.
    */
-  async createExtraMatch(userId: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        userId,
-        status: 'COMPLETED',
-        memo: EXTRA_MATCH_MEMO,
-        consumedAt: null,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!payment) {
-      throw new BadRequestException('No completed payment found for an extra match');
-    }
-
-    const eligible = await this.loadEligibleUsers();
+  private async findExtraCandidate(userId: string): Promise<
+    { candidate: Candidate; reason: null } | { candidate: null; reason: 'voice_intro' | 'no_candidates' }
+  > {
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true, name: true, verified: true, trustScore: true, languages: true, dailyVibe: true,
+        voiceIntroUrl: true,
         profile: { select: { gender: true, lookingFor: true, interests: true } },
       },
     });
     if (!me) throw new NotFoundException('User not found');
+    // Daily Match requires a Voice Intro from everyone, the buyer included.
+    if (!me.voiceIntroUrl) return { candidate: null, reason: 'voice_intro' };
 
     const self: Candidate = {
       id: me.id, name: me.name, verified: me.verified, trustScore: me.trustScore,
@@ -265,7 +253,7 @@ export class DailyMatchService {
       interests: me.profile?.interests ?? [],
     };
 
-    const recentPairs = await this.loadRecentPairs();
+    const [eligible, recentPairs] = await Promise.all([this.loadEligibleUsers(), this.loadRecentPairs()]);
     const candidates = eligible.filter(
       (o) =>
         o.id !== userId &&
@@ -273,23 +261,71 @@ export class DailyMatchService {
         genderCompatible(self.gender, self.lookingFor, o.gender, o.lookingFor) &&
         !recentPairs.has(this.pairKey(userId, o.id)),
     );
-    if (candidates.length === 0) {
-      throw new BadRequestException('No one available right now — try again later');
-    }
+    if (candidates.length === 0) return { candidate: null, reason: 'no_candidates' };
 
     const best = candidates
       .map((c) => ({ c, score: this.score(self, c) }))
       .sort((x, y) => y.score - x.score)[0];
+    return { candidate: best.c, reason: null };
+  }
+
+  /** A completed extra-match payment that has not been turned into a match yet. */
+  private findUnusedExtraPayment(userId: string) {
+    return this.prisma.payment.findFirst({
+      where: { userId, status: 'COMPLETED', memo: EXTRA_MATCH_MEMO, consumedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Asked by the app before it starts a payment. `hasCredit` means an earlier
+   * payment is still unused, so the next match must be claimed without paying
+   * again; `available` false means paying now would buy nothing.
+   */
+  async getExtraStatus(userId: string) {
+    const [credit, found] = await Promise.all([
+      this.findUnusedExtraPayment(userId),
+      this.findExtraCandidate(userId),
+    ]);
+    return { hasCredit: !!credit, available: found.reason === null, reason: found.reason };
+  }
+
+  /**
+   * Paid extra match (0.2 Pi) — bypasses the once-a-day rule.
+   *
+   * The payment is verified here rather than trusted from the client: the
+   * caller must have a COMPLETED, not-yet-consumed payment with the extra-match
+   * memo, and it is marked consumed before the match is created so the same
+   * payment can't be replayed.
+   */
+  async createExtraMatch(userId: string) {
+    const payment = await this.findUnusedExtraPayment(userId);
+    if (!payment) {
+      throw new BadRequestException('No completed payment found for an extra match');
+    }
+
+    const found = await this.findExtraCandidate(userId);
+    if (!found.candidate) {
+      throw new BadRequestException(
+        found.reason === 'voice_intro'
+          ? 'Record a voice intro first'
+          : 'No one available right now — try again later',
+      );
+    }
 
     // Burn the payment only once a match is actually guaranteed — failing to
-    // find a candidate above leaves it unconsumed so the user can retry later
-    // without paying twice.
-    await this.prisma.payment.update({
-      where: { id: payment.id },
+    // find a candidate above leaves it unconsumed so the user can claim it
+    // later without paying twice. The conditional update makes two concurrent
+    // claims of the same payment produce one match, not two.
+    const claimed = await this.prisma.payment.updateMany({
+      where: { id: payment.id, consumedAt: null },
       data: { consumedAt: new Date() },
     });
+    if (claimed.count === 0) {
+      throw new BadRequestException('No completed payment found for an extra match');
+    }
 
-    const match = await this.createMatch(userId, best.c.id, new Date());
+    const match = await this.createMatch(userId, found.candidate.id, new Date());
     return this.getById(match.id, userId);
   }
 

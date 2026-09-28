@@ -52,7 +52,15 @@ async function bootstrap() {
     // Kicked off, never awaited — see pi-api-status.ts for why health must stay
     // instant and must not go red when Pi is unreachable.
     refreshPiApiStatusIfStale();
-    res.json({ status: 'ok', ts: Date.now(), pi_api: piApiStatus(), payments_last: paymentDiagnostics() });
+    res.json({
+      status: 'ok',
+      ts: Date.now(),
+      pi_api: piApiStatus(),
+      payments_last: paymentDiagnostics(),
+      // Whether Web Push can send at all — both VAPID keys must be set. Only a
+      // boolean, never the keys.
+      push_configured: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    });
   });
 
   // Cheap unauthenticated keep-alive target. Deliberately outside the /v1

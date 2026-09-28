@@ -7,7 +7,7 @@ describe('ClubsService.create', () => {
       club: { create: vi.fn((args: { data: object }) => Promise.resolve({ id: 'c1', ...args.data })) },
       clubMember: { create: vi.fn().mockResolvedValue({}) },
     };
-    return { prisma, service: new ClubsService(prisma as never, {} as never) };
+    return { prisma, service: new ClubsService(prisma as never, {} as never, {} as never) };
   }
 
   it('writes only the allowed fields, PENDING and owned by the caller', async () => {

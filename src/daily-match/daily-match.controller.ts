@@ -64,6 +64,12 @@ export class DailyMatchController {
     return this.service.skipIcebreaker(id, req.user.id);
   }
 
+  /** Checked before paying: is there an unused paid extra, and anyone to match? */
+  @Get('extra/status')
+  async extraStatus(@Request() req: { user: { id: string } }) {
+    return this.service.getExtraStatus(req.user.id);
+  }
+
   /**
    * Called by the client only after the Pi payment has completed. The payment
    * itself goes through the existing /payments create → approve → complete flow.

@@ -44,3 +44,10 @@ export class CreateEventDto {
   @Max(1000)
   maxAttendees?: number;
 }
+
+export const FEEDBACK_RATINGS = ['great', 'okay', 'missed'] as const;
+
+export class EventFeedbackDto {
+  @IsIn(FEEDBACK_RATINGS as unknown as string[])
+  rating!: string;
+}

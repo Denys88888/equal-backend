@@ -34,7 +34,7 @@ function row(over: Record<string, unknown> = {}) {
 describe('AdminService — ban lifecycle', () => {
   it('unban clears bannedUntil, not just isActive', async () => {
     const prisma = makePrisma();
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     await service.setBan('u1', false);
 
@@ -48,7 +48,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('ban deactivates the account', async () => {
     const prisma = makePrisma();
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     await service.setBan('u1', true);
 
@@ -60,7 +60,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('rejects an unknown user', async () => {
     const prisma = makePrisma([], null);
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     await expect(service.setBan('nope', false)).rejects.toThrow(NotFoundException);
     expect(prisma.user.update).not.toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('reports an auto-banned user (bannedUntil in the future) as Banned', async () => {
     const prisma = makePrisma([row({ isActive: true, bannedUntil: new Date(Date.now() + HOUR) })]);
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     const [user] = await service.getUsers();
 
@@ -79,7 +79,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('reports a deactivated user as Banned', async () => {
     const prisma = makePrisma([row({ isActive: false })]);
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     const [user] = await service.getUsers();
     expect(user.status).toBe('Banned');
@@ -87,7 +87,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('reports a user whose ban already elapsed as Active', async () => {
     const prisma = makePrisma([row({ isActive: true, bannedUntil: new Date(Date.now() - HOUR) })]);
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     const [user] = await service.getUsers();
     expect(user.status).toBe('Active');
@@ -95,7 +95,7 @@ describe('AdminService — ban lifecycle', () => {
 
   it('reports an ordinary user as Active', async () => {
     const prisma = makePrisma([row()]);
-    const service = new AdminService(prisma as never);
+    const service = new AdminService(prisma as never, {} as never);
 
     const [user] = await service.getUsers();
     expect(user.status).toBe('Active');
@@ -107,13 +107,13 @@ describe('AdminService — event moderation', () => {
     const prisma = {
       event: { findUnique: vi.fn().mockResolvedValue({ id: 'e1' }), update: vi.fn().mockResolvedValue({}) },
     };
-    await new AdminService(prisma as never).approveEvent('e1');
+    await new AdminService(prisma as never, {} as never).approveEvent('e1');
     expect(prisma.event.update).toHaveBeenCalledWith({ where: { id: 'e1' }, data: { status: 'ACTIVE' } });
   });
 
   it('refuses to approve an event that does not exist', async () => {
     const prisma = { event: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() } };
-    await expect(new AdminService(prisma as never).approveEvent('nope')).rejects.toThrow(NotFoundException);
+    await expect(new AdminService(prisma as never, {} as never).approveEvent('nope')).rejects.toThrow(NotFoundException);
     expect(prisma.event.update).not.toHaveBeenCalled();
   });
 });

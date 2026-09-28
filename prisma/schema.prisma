@@ -71,6 +71,7 @@ model User {
   clubPostComments ClubPostComment[]
   createdClubs Club[] @relation("ClubCreator")
   createdEvents Event[] @relation("EventCreator")
+  eventFeedback EventFeedback[]
   dailyMatchesA DailyMatch[] @relation("DailyMatchUserA")
   dailyMatchesB DailyMatch[] @relation("DailyMatchUserB")
   dailyMatchMessages DailyMatchMessage[]
@@ -396,8 +397,24 @@ model Event {
   creator      User? @relation("EventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   rsvps        EventRsvp[]
+  feedback     EventFeedback[]
 
   @@index([status])
+}
+
+// "How was the event?" after an event someone attended. The sheet used to keep
+// the answer in React state and send it nowhere.
+model EventFeedback {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  rating    String   // great | okay | missed
+  createdAt DateTime @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
 }
 
 enum EventStatus {
