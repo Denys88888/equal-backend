@@ -6,6 +6,7 @@ import { AdminService, WARN_TRUST_PENALTY } from './admin/admin.service';
 import { VerificationService } from './verification/verification.service';
 import { UsersService } from './users/users.service';
 import { AskService } from './ask/ask.service';
+import { DemoProfilesBootstrap } from './users/demo-profiles';
 
 /**
  * Regression tests for the 2026-09-28 QA pass: each block is a defect that was
@@ -276,5 +277,16 @@ describe('Fake profiles — nothing paid can reach them', () => {
     const service = new DailyMatchService(prisma as never, {} as never, {} as never, {} as never, {} as never);
     await (service as unknown as { loadEligibleUsers: () => Promise<unknown> }).loadEligibleUsers();
     expect(userFindMany.mock.calls[0][0].where.isDemo).toBe(false);
+  });
+});
+
+describe('DemoProfilesBootstrap', () => {
+  it('marks only seeded pilot accounts (pilot_ Pi uid) as fake and un-verifies them', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 30 });
+    const boot = new DemoProfilesBootstrap({ user: { updateMany } } as never);
+    await expect(boot.markDemoProfiles()).resolves.toBe(30);
+    const { where, data } = updateMany.mock.calls[0][0];
+    expect(where.piUid).toEqual({ startsWith: 'pilot_' });
+    expect(data).toEqual({ isDemo: true, verified: false });
   });
 });

@@ -3,11 +3,12 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { PushService } from './push.service';
 import { UploadModule } from '../upload/upload.module';
+import { DemoProfilesBootstrap } from './demo-profiles';
 
 @Module({
   imports: [UploadModule],
   controllers: [UsersController],
-  providers: [UsersService, PushService],
+  providers: [UsersService, PushService, DemoProfilesBootstrap],
   exports: [UsersService, PushService],
 })
 export class UsersModule {}
