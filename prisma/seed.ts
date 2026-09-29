@@ -181,6 +181,10 @@ async function main() {
       } else {
         await prisma.photo.create({ data: { userId: existing.id, url: newAvatar, isMain: true, order: 0 } });
       }
+      // Pilots were created verified: true, so a fake profile wore the same
+      // verified badge real people earn with a selfie. They are marked as demo
+      // (the app shows a "Fake" badge) and never verified.
+      await prisma.user.update({ where: { id: existing.id }, data: { isDemo: true, verified: false } });
       console.log(`↻ Refreshed avatar: ${p.name}`);
       i++;
       continue;
@@ -194,7 +198,8 @@ async function main() {
         piUid: `pilot_${username}`,
         name: p.name,
         username,
-        verified: true,
+        isDemo: true,
+        verified: false,
         sparkBalance: Math.floor(Math.random() * 20) + 5,
         profile: {
           create: {

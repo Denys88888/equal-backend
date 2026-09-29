@@ -104,11 +104,24 @@ export class AskService {
     };
   }
 
+  /**
+   * Fake (demo) profiles can't answer, and questions may cost Pi — so they
+   * can't be asked at all. Checked at quote time, before anyone pays.
+   */
+  private async assertNotDemo(targetIdOrUsername: string) {
+    const target = await this.prisma.user.findFirst({
+      where: { OR: [{ id: targetIdOrUsername }, { username: insensitive(targetIdOrUsername) }] },
+      select: { isDemo: true },
+    });
+    if (target?.isDemo) throw new BadRequestException('This is a fake profile — it cannot receive questions');
+  }
+
   async quote(
     askerId: string,
     targetId: string,
     opts: { isAnonymous: boolean; isUrgent: boolean },
   ) {
+    await this.assertNotDemo(targetId);
     const { price, usedFreeToday, breakdown } = await this.priceFor(askerId, targetId, opts);
     return { price, memo: ASK_MEMO, usedFreeToday, breakdown, free: price === 0 };
   }
@@ -188,7 +201,7 @@ export class AskService {
   async getPublic(targetId: string, page = 1, viewerId?: string) {
     const target = await this.prisma.user.findFirst({
       where: { OR: [{ id: targetId }, { username: insensitive(targetId) }], isActive: true },
-      select: { id: true, name: true, username: true },
+      select: { id: true, name: true, username: true, isDemo: true },
     });
     if (!target) throw new NotFoundException('Profile not found');
 
@@ -211,7 +224,7 @@ export class AskService {
     ]);
 
     return {
-      target: { id: target.id, name: target.name, username: target.username },
+      target: { id: target.id, name: target.name, username: target.username, isDemo: target.isDemo },
       questions: rows.map((q) => this.toPublic(q, viewerId)),
       answeredCount,
       totalCount,
@@ -284,10 +297,11 @@ export class AskService {
   ) {
     const target = await this.prisma.user.findFirst({
       where: { OR: [{ id: targetIdOrUsername }, { username: insensitive(targetIdOrUsername) }], isActive: true },
-      select: { id: true },
+      select: { id: true, isDemo: true },
     });
     if (!target) throw new NotFoundException('Profile not found');
     if (target.id === askerId) throw new BadRequestException('You cannot ask yourself a question');
+    if (target.isDemo) throw new BadRequestException('This is a fake profile — it cannot receive questions');
 
     // A block in either direction hides the profile everywhere else; asking
     // around it would be a way to keep messaging someone who blocked you.

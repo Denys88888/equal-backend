@@ -141,6 +141,7 @@ export class ProfilesService {
         bio: user.profile?.bio || '',
         interests: user.profile?.interests || [],
         verified: user.verified ?? false,
+        isDemo: user.isDemo ?? false,
         activeNow: this.gateway.isOnline(user.id),
         isNew: false,
       };
@@ -212,6 +213,7 @@ export class ProfilesService {
       bio: target.profile?.bio || '',
       interests: theirInterests,
       verified: target.verified ?? false,
+      isDemo: target.isDemo ?? false,
       activeNow: this.gateway.isOnline(target.id),
       isMatch: !!myMatches,
       matchId: myMatches?.id ?? null,

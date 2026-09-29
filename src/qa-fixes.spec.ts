@@ -5,6 +5,7 @@ import { EventsService } from './events/events.service';
 import { AdminService, WARN_TRUST_PENALTY } from './admin/admin.service';
 import { VerificationService } from './verification/verification.service';
 import { UsersService } from './users/users.service';
+import { AskService } from './ask/ask.service';
 
 /**
  * Regression tests for the 2026-09-28 QA pass: each block is a defect that was
@@ -238,5 +239,42 @@ describe('UsersService.getAchievements', () => {
     const where = prisma.eventRsvp.count.mock.calls[0][0].where;
     expect(where).toMatchObject({ userId: 'u1', status: 'GOING' });
     expect(where.event.date.lt).toBeInstanceOf(Date);
+  });
+});
+
+// ── Fake (demo) profiles ────────────────────────────────────────────────────
+
+describe('Fake profiles — nothing paid can reach them', () => {
+  function ask(targetIsDemo: boolean) {
+    const prisma = {
+      user: { findFirst: vi.fn().mockResolvedValue({ id: 't1', isDemo: targetIsDemo }) },
+      askQuestion: { count: vi.fn().mockResolvedValue(0) },
+      swipeAction: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const service = new AskService(prisma as never, {} as never, {} as never);
+    return { service, prisma };
+  }
+
+  it('refuses to even quote a question to a fake profile, so nobody pays', async () => {
+    const { service } = ask(true);
+    await expect(service.quote('me', 't1', { isAnonymous: false, isUrgent: false })).rejects.toThrow('fake profile');
+  });
+
+  it('refuses to create one', async () => {
+    const { service } = ask(true);
+    await expect(service.create('me', 't1', { content: 'hi?' })).rejects.toThrow('fake profile');
+  });
+
+  it('still quotes a real profile', async () => {
+    const { service } = ask(false);
+    await expect(service.quote('me', 't1', { isAnonymous: false, isUrgent: false })).resolves.toMatchObject({ free: true });
+  });
+
+  it('keeps fake profiles out of Daily Match', async () => {
+    const userFindMany = vi.fn().mockResolvedValue([]);
+    const prisma = { user: { findMany: userFindMany }, dailyMatch: { findMany: vi.fn().mockResolvedValue([]) } };
+    const service = new DailyMatchService(prisma as never, {} as never, {} as never, {} as never, {} as never);
+    await (service as unknown as { loadEligibleUsers: () => Promise<unknown> }).loadEligibleUsers();
+    expect(userFindMany.mock.calls[0][0].where.isDemo).toBe(false);
   });
 });

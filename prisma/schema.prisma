@@ -50,6 +50,10 @@ model User {
   notifyClubs    Boolean @default(true)
   // Interface language, sent by the app, so push notifications arrive in it.
   locale         String  @default("en")
+  // Team-made fake profile (the seeded "pilot" accounts). Shown with a "Fake"
+  // badge, never verified, kept out of Daily Match and admin counts, and
+  // nothing paid can be sent to it.
+  isDemo         Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

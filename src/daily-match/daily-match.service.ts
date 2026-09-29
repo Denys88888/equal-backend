@@ -123,6 +123,7 @@ export class DailyMatchService {
       where: {
         isActive: true,
         ghostMode: false,
+        isDemo: false,
         voiceIntroUrl: { not: null },
         OR: [{ bannedUntil: null }, { bannedUntil: { lt: now } }],
       },

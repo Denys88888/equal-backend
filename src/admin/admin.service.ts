@@ -20,8 +20,9 @@ export class AdminService {
       totalUsers, activeToday, totalMatches, pendingReports,
       revenueAll, revenueToday, giftRevenue, ticketRevenue,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { updatedAt: { gte: new Date(Date.now() - 86400000) } } }),
+      // Fake (demo) profiles are not users; counting them inflated the totals.
+      this.prisma.user.count({ where: { isDemo: false } }),
+      this.prisma.user.count({ where: { isDemo: false, updatedAt: { gte: new Date(Date.now() - 86400000) } } }),
       this.prisma.match.count(),
       this.prisma.report.count({ where: { status: 'PENDING' } }),
       // Every payment in this app (gifts, event tickets) goes to the app's own
@@ -72,7 +73,7 @@ export class AdminService {
     const users = await this.prisma.user.findMany({
       select: {
         id: true, name: true, email: true, trustScore: true, verified: true,
-        isActive: true, bannedUntil: true, badges: true, createdAt: true,
+        isActive: true, bannedUntil: true, badges: true, createdAt: true, isDemo: true,
         profile: { select: { bio: true } },
         _count: { select: { matches1: true, matches2: true } },
       },
@@ -87,6 +88,7 @@ export class AdminService {
       trustScore: u.trustScore,
       verified: u.verified,
       badges: u.badges,
+      isDemo: u.isDemo,
       bio: u.profile?.bio ?? '',
       matches: u._count.matches1 + u._count.matches2,
       // An auto-ban (3 reports in 24h) sets only bannedUntil and leaves
