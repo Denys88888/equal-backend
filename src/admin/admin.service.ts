@@ -75,6 +75,9 @@ export class AdminService {
         id: true, name: true, email: true, trustScore: true, verified: true,
         isActive: true, bannedUntil: true, badges: true, createdAt: true, isDemo: true,
         profile: { select: { bio: true } },
+        // The admin list renders an avatar per row but was never sent one, so
+        // every user showed as an initial.
+        photos: { orderBy: { order: 'asc' }, take: 1, select: { url: true } },
         _count: { select: { matches1: true, matches2: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -89,6 +92,7 @@ export class AdminService {
       verified: u.verified,
       badges: u.badges,
       isDemo: u.isDemo,
+      avatar: u.photos[0]?.url ?? '',
       bio: u.profile?.bio ?? '',
       matches: u._count.matches1 + u._count.matches2,
       // An auto-ban (3 reports in 24h) sets only bannedUntil and leaves
