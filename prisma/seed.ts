@@ -112,6 +112,15 @@ function makeAvatar(name: string, seed: number): string {
 
 const PILOT_TAG = ' — Equal pilot profile 🚀';
 
+/** AI-generated portraits bundled with the frontend; same map as src/users/demo-profiles.ts. */
+const PILOT_PHOTOS: Record<string, string> = {
+  natalia_pilot: './avatar-ava.jpg',
+  aleksandra_pilot: './avatar-emma.jpg',
+  kasia_pilot: './avatar-olivia.jpg',
+  zofia_pilot: './avatar-sarah.jpg',
+  ola_pilot: './avatar-sophia.jpg',
+};
+
 const NAMES: { name: string; gender: 'female' | 'male'; interests: string[]; goal: string; bioCore: string }[] = [
   { name: 'Zofia',      gender: 'female', interests: ['Coffee', 'Art', 'Travel'],           goal: 'Serious relationship',         bioCore: 'Gallery curator exploring Warsaw one exhibition at a time.' },
   { name: 'Kasia',      gender: 'female', interests: ['Yoga', 'Books', 'Coffee'],            goal: 'Dating',                       bioCore: 'Yoga instructor with a growing pile of unread novels.' },
@@ -175,7 +184,7 @@ async function main() {
       // pilots, so without this an avatar-generator change would silently do
       // nothing for anyone already in the database).
       const mainPhoto = await prisma.photo.findFirst({ where: { userId: existing.id, isMain: true } });
-      const newAvatar = makeAvatar(p.name, i);
+      const newAvatar = PILOT_PHOTOS[username] ?? makeAvatar(p.name, i);
       if (mainPhoto) {
         await prisma.photo.update({ where: { id: mainPhoto.id }, data: { url: newAvatar } });
       } else {
@@ -216,7 +225,7 @@ async function main() {
     });
 
     await prisma.photo.create({
-      data: { userId: user.id, url: makeAvatar(p.name, i), isMain: true, order: 0 },
+      data: { userId: user.id, url: PILOT_PHOTOS[username] ?? makeAvatar(p.name, i), isMain: true, order: 0 },
     });
 
     console.log(`✓ Created: ${p.name} (Warsaw, pilot)`);

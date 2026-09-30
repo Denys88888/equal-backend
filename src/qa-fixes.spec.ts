@@ -290,3 +290,26 @@ describe('DemoProfilesBootstrap', () => {
     expect(data).toEqual({ isDemo: true, verified: false });
   });
 });
+
+describe('DemoProfilesBootstrap.applyDemoPhotos', () => {
+  it('sets the listed portraits on seeded fake profiles only, and is idempotent', async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const prisma = {
+      user: { findFirst: vi.fn(({ where }: { where: { username: string; piUid?: unknown } }) =>
+        Promise.resolve(where.username === 'kasia_pilot' ? { id: 'k' } : null)) },
+      photo: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'p1', url: 'data:image/svg+xml;base64,x' }),
+        update, create: vi.fn(),
+      },
+    };
+    const boot = new DemoProfilesBootstrap(prisma as never);
+    await expect(boot.applyDemoPhotos()).resolves.toBe(1);
+    expect(update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { url: './avatar-olivia.jpg' } });
+    expect(prisma.user.findFirst.mock.calls[0][0].where.piUid).toEqual({ startsWith: 'pilot_' });
+
+    prisma.photo.findFirst.mockResolvedValue({ id: 'p1', url: './avatar-olivia.jpg' });
+    update.mockClear();
+    await expect(boot.applyDemoPhotos()).resolves.toBe(0);
+    expect(update).not.toHaveBeenCalled();
+  });
+});
