@@ -92,7 +92,7 @@ export class AdminService {
       verified: u.verified,
       badges: u.badges,
       isDemo: u.isDemo,
-      avatar: u.photos[0]?.url ?? '',
+      avatar: u.photos?.[0]?.url ?? '',
       bio: u.profile?.bio ?? '',
       matches: u._count.matches1 + u._count.matches2,
       // An auto-ban (3 reports in 24h) sets only bannedUntil and leaves
