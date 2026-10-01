@@ -5,6 +5,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MessagesService } from './messages.service';
 import { UploadService } from '../upload/upload.service';
+import { isAudioUpload, recordAudioUpload } from '../common/audio-upload';
 
 @ApiTags('Messages')
 @Controller('matches/:matchId/messages')
@@ -44,11 +45,18 @@ export class MessagesController {
     @Param('matchId') matchId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('No audio file provided');
-    if (!file.mimetype?.startsWith('audio/')) {
-      throw new BadRequestException('File must be audio');
+    if (!isAudioUpload(file)) {
+      recordAudioUpload('voice-message', file, 'rejected');
+      throw new BadRequestException(file ? 'File must be audio' : 'No audio file provided');
     }
-    const url = await this.uploadService.uploadAudio(file, req.user.id);
+    let url: string;
+    try {
+      url = await this.uploadService.uploadAudio(file, req.user.id);
+    } catch (err) {
+      recordAudioUpload('voice-message', file, 'storage_error', String((err as Error)?.message ?? err));
+      throw err;
+    }
+    recordAudioUpload('voice-message', file, 'ok');
     return this.messagesService.create(matchId, req.user.id, url, 'VOICE');
   }
 

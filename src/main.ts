@@ -11,6 +11,7 @@ import { piApiStatus, refreshPiApiStatusIfStale } from './common/pi-api-status';
 import { paymentDiagnostics } from './common/payment-diagnostics';
 import * as path from 'path';
 import * as fs from 'fs';
+import { audioUploadDiagnostics } from './common/audio-upload';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -60,6 +61,11 @@ async function bootstrap() {
       // Whether Web Push can send at all — both VAPID keys must be set. Only a
       // boolean, never the keys.
       push_configured: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+      // Where uploads go. "local" is Render's disk, which every deploy wipes —
+      // photos and voice clips stored there disappear on the next release.
+      uploads: process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET
+        ? 'cloudinary' : 'local',
+      audio_last: audioUploadDiagnostics(),
     });
   });
 

@@ -7,6 +7,7 @@ import { UsersService } from './users.service';
 import { UploadService } from '../upload/upload.service';
 import { PushService } from './push.service';
 import { UpdateSettingsDto } from './users.dto';
+import { isAudioUpload, recordAudioUpload } from '../common/audio-upload';
 
 @ApiTags('Users')
 @Controller('users')
@@ -65,11 +66,18 @@ export class UsersController {
     @Request() req: { user: { id: string } },
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException('No audio uploaded');
-    if (!file.mimetype?.startsWith('audio/')) {
-      throw new BadRequestException('File must be audio');
+    if (!isAudioUpload(file)) {
+      recordAudioUpload('voice-intro', file, 'rejected');
+      throw new BadRequestException(file ? 'File must be audio' : 'No audio uploaded');
     }
-    const url = await this.uploadService.uploadAudio(file, req.user.id);
+    let url: string;
+    try {
+      url = await this.uploadService.uploadAudio(file, req.user.id);
+    } catch (err) {
+      recordAudioUpload('voice-intro', file, 'storage_error', String((err as Error)?.message ?? err));
+      throw err;
+    }
+    recordAudioUpload('voice-intro', file, 'ok');
     return this.usersService.setVoiceIntro(req.user.id, url);
   }
 
