@@ -17,6 +17,7 @@ export const PUSH_KEYS = [
   'dm_nudge_title', 'dm_nudge_body', 'dm_soon_title', 'dm_soon_body',
   'vibe_title', 'vibe_body',
   'ask_new_title', 'ask_new_body', 'ask_answer_title', 'ask_answer_body',
+  'call_title', 'call_body',
 ] as const;
 
 export type PushKey = (typeof PUSH_KEYS)[number];
@@ -30,6 +31,7 @@ const ROWS: Record<string, string[]> = {
     "You haven't written to your match yet", '{hours} h left', '🔔 Daily Match in 5 minutes', "You're about to meet someone new",
     "What's your vibe today?", "Pick a vibe and we'll find a match to fit it",
     'New question! 💜', 'Someone wants to know you better', 'Your question got an answer! 🎉', '{name} replied to your question',
+    '📹 {name} is calling you', 'Video call — tap to answer',
   ],
   ru: [
     'Это мэтч! 💜', 'Вы с {name} понравились друг другу!',
@@ -39,6 +41,7 @@ const ROWS: Record<string, string[]> = {
     'Ты ещё не написал(а) своему мэтчу', 'Осталось {hours} ч', '🔔 Daily Match через 5 минут', 'Скоро познакомишься с новым человеком',
     'Какой у тебя настрой сегодня?', 'Выбери вайб — подберём мэтч под него',
     'Новый вопрос! 💜', 'Кто-то хочет узнать тебя получше', 'На твой вопрос ответили! 🎉', '{name} ответил(а) на твой вопрос',
+    '📹 {name} звонит тебе', 'Видеозвонок — нажми, чтобы ответить',
   ],
   uk: [
     'Це метч! 💜', 'Ви з {name} сподобалися одне одному!',
@@ -48,6 +51,7 @@ const ROWS: Record<string, string[]> = {
     'Ти ще не написав(ла) своєму метчу', 'Залишилось {hours} год', '🔔 Daily Match за 5 хвилин', 'Скоро познайомишся з новою людиною',
     'Який у тебе настрій сьогодні?', 'Обери вайб — підберемо метч під нього',
     'Нове питання! 💜', 'Хтось хоче дізнатися тебе краще', 'На твоє питання відповіли! 🎉', '{name} відповів(ла) на твоє питання',
+    '📹 {name} телефонує тобі', 'Відеодзвінок — натисни, щоб відповісти',
   ],
   de: [
     "It's a Match! 💜", 'Du und {name} mögt euch!',
@@ -57,6 +61,7 @@ const ROWS: Record<string, string[]> = {
     'Du hast deinem Match noch nicht geschrieben', 'Noch {hours} Std.', '🔔 Daily Match in 5 Minuten', 'Gleich lernst du jemand Neues kennen',
     'Wie ist deine Stimmung heute?', 'Wähle einen Vibe — wir finden ein passendes Match',
     'Neue Frage! 💜', 'Jemand möchte dich besser kennenlernen', 'Deine Frage wurde beantwortet! 🎉', '{name} hat auf deine Frage geantwortet',
+    '📹 {name} ruft dich an', 'Videoanruf — tippe, um anzunehmen',
   ],
   es: [
     '¡Es un match! 💜', '¡A ti y a {name} os gustáis!',
@@ -66,6 +71,7 @@ const ROWS: Record<string, string[]> = {
     'Aún no le has escrito a tu match', 'Quedan {hours} h', '🔔 Daily Match en 5 minutos', 'Estás a punto de conocer a alguien nuevo',
     '¿Cuál es tu vibra hoy?', 'Elige una vibra y te buscamos un match que encaje',
     '¡Nueva pregunta! 💜', 'Alguien quiere conocerte mejor', '¡Tu pregunta tiene respuesta! 🎉', '{name} respondió a tu pregunta',
+    '📹 {name} te está llamando', 'Videollamada: toca para responder',
   ],
   fr: [
     "C'est un match ! 💜", 'Vous vous plaisez, {name} et vous !',
@@ -75,6 +81,7 @@ const ROWS: Record<string, string[]> = {
     "Vous n'avez pas encore écrit à votre match", 'Encore {hours} h', '🔔 Daily Match dans 5 minutes', 'Vous allez rencontrer quelqu’un de nouveau',
     "Quelle est votre humeur aujourd'hui ?", 'Choisissez une humeur, on vous trouve un match assorti',
     'Nouvelle question ! 💜', "Quelqu'un veut mieux vous connaître", 'Votre question a une réponse ! 🎉', '{name} a répondu à votre question',
+    '📹 {name} vous appelle', 'Appel vidéo — touchez pour répondre',
   ],
   pt: [
     'Deu match! 💜', 'Você e {name} se curtiram!',
@@ -84,6 +91,7 @@ const ROWS: Record<string, string[]> = {
     'Você ainda não escreveu para o seu match', 'Faltam {hours} h', '🔔 Daily Match em 5 minutos', 'Você vai conhecer alguém novo',
     'Qual é a sua vibe hoje?', 'Escolha uma vibe e encontramos um match que combine',
     'Nova pergunta! 💜', 'Alguém quer conhecer você melhor', 'Sua pergunta foi respondida! 🎉', '{name} respondeu à sua pergunta',
+    '📹 {name} está te ligando', 'Chamada de vídeo — toque para atender',
   ],
   it: [
     "È un match! 💜", 'Tu e {name} vi piacete!',
@@ -93,6 +101,7 @@ const ROWS: Record<string, string[]> = {
     'Non hai ancora scritto al tuo match', 'Mancano {hours} h', '🔔 Daily Match tra 5 minuti', 'Stai per conoscere qualcuno di nuovo',
     'Che vibe hai oggi?', 'Scegli una vibe e troviamo un match adatto',
     'Nuova domanda! 💜', 'Qualcuno vuole conoscerti meglio', 'La tua domanda ha una risposta! 🎉', '{name} ha risposto alla tua domanda',
+    '📹 {name} ti sta chiamando', 'Videochiamata — tocca per rispondere',
   ],
   pl: [
     'Jest match! 💜', 'Ty i {name} polubiliście się nawzajem!',
@@ -102,6 +111,7 @@ const ROWS: Record<string, string[]> = {
     'Nie napisałeś(-aś) jeszcze do swojego matcha', 'Zostało {hours} godz.', '🔔 Daily Match za 5 minut', 'Zaraz poznasz kogoś nowego',
     'Jaki masz dziś nastrój?', 'Wybierz vibe — dobierzemy do niego matcha',
     'Nowe pytanie! 💜', 'Ktoś chce cię lepiej poznać', 'Ktoś odpowiedział na twoje pytanie! 🎉', '{name} odpowiedział(a) na twoje pytanie',
+    '📹 {name} dzwoni do Ciebie', 'Rozmowa wideo — dotknij, aby odebrać',
   ],
   nl: [
     "Het is een match! 💜", 'Jij en {name} vinden elkaar leuk!',
@@ -111,6 +121,7 @@ const ROWS: Record<string, string[]> = {
     'Je hebt je match nog niet geschreven', 'Nog {hours} u', '🔔 Daily Match over 5 minuten', 'Je gaat zo iemand nieuws ontmoeten',
     'Wat is je vibe vandaag?', 'Kies een vibe, dan zoeken we een match die past',
     'Nieuwe vraag! 💜', 'Iemand wil je beter leren kennen', 'Je vraag is beantwoord! 🎉', '{name} heeft je vraag beantwoord',
+    '📹 {name} belt je', 'Videogesprek — tik om op te nemen',
   ],
   sv: [
     'Det är en match! 💜', 'Du och {name} gillar varandra!',
@@ -120,6 +131,7 @@ const ROWS: Record<string, string[]> = {
     'Du har inte skrivit till din match än', '{hours} tim kvar', '🔔 Daily Match om 5 minuter', 'Snart träffar du någon ny',
     'Vilken vibe har du i dag?', 'Välj en vibe så hittar vi en match som passar',
     'Ny fråga! 💜', 'Någon vill lära känna dig bättre', 'Din fråga har fått svar! 🎉', '{name} svarade på din fråga',
+    '📹 {name} ringer dig', 'Videosamtal – tryck för att svara',
   ],
   da: [
     'Det er et match! 💜', 'Du og {name} kan lide hinanden!',
@@ -129,6 +141,7 @@ const ROWS: Record<string, string[]> = {
     'Du har ikke skrevet til dit match endnu', '{hours} t tilbage', '🔔 Daily Match om 5 minutter', 'Du møder snart en ny person',
     'Hvad er din vibe i dag?', 'Vælg en vibe, så finder vi et match, der passer',
     'Nyt spørgsmål! 💜', 'Nogen vil gerne lære dig bedre at kende', 'Dit spørgsmål har fået svar! 🎉', '{name} har svaret på dit spørgsmål',
+    '📹 {name} ringer til dig', 'Videoopkald – tryk for at svare',
   ],
   no: [
     'Det er en match! 💜', 'Du og {name} liker hverandre!',
@@ -138,6 +151,7 @@ const ROWS: Record<string, string[]> = {
     'Du har ikke skrevet til matchen din ennå', '{hours} t igjen', '🔔 Daily Match om 5 minutter', 'Snart møter du noen nye',
     'Hvilken vibe har du i dag?', 'Velg en vibe, så finner vi en match som passer',
     'Nytt spørsmål! 💜', 'Noen vil bli bedre kjent med deg', 'Spørsmålet ditt har fått svar! 🎉', '{name} svarte på spørsmålet ditt',
+    '📹 {name} ringer deg', 'Videosamtale – trykk for å svare',
   ],
   fi: [
     'Se on match! 💜', 'Sinä ja {name} tykkäätte toisistanne!',
@@ -147,6 +161,7 @@ const ROWS: Record<string, string[]> = {
     'Et ole vielä kirjoittanut matchillesi', '{hours} h jäljellä', '🔔 Daily Match 5 minuutin päästä', 'Tapaat pian jonkun uuden',
     'Millainen fiilis sinulla on tänään?', 'Valitse fiilis, niin etsimme siihen sopivan matchin',
     'Uusi kysymys! 💜', 'Joku haluaa tutustua sinuun paremmin', 'Kysymykseesi vastattiin! 🎉', '{name} vastasi kysymykseesi',
+    '📹 {name} soittaa sinulle', 'Videopuhelu – vastaa napauttamalla',
   ],
   cs: [
     'Je to match! 💜', 'Ty a {name} se líbíte!',
@@ -156,6 +171,7 @@ const ROWS: Record<string, string[]> = {
     'Ještě jsi nenapsal(a) svému matchi', 'Zbývá {hours} h', '🔔 Daily Match za 5 minut', 'Za chvíli poznáš někoho nového',
     'Jakou máš dnes náladu?', 'Vyber si vibe a najdeme k němu match',
     'Nová otázka! 💜', 'Někdo tě chce lépe poznat', 'Na tvou otázku přišla odpověď! 🎉', '{name} odpověděl(a) na tvou otázku',
+    '📹 {name} ti volá', 'Videohovor – klepnutím ho přijmeš',
   ],
   el: [
     'Έχεις match! 💜', 'Εσύ και ο/η {name} αρέσετε ο ένας στον άλλον!',
@@ -165,6 +181,7 @@ const ROWS: Record<string, string[]> = {
     'Δεν έχεις γράψει ακόμα στο match σου', 'Απομένουν {hours} ώρες', '🔔 Daily Match σε 5 λεπτά', 'Σε λίγο θα γνωρίσεις κάποιον νέο',
     'Τι διάθεση έχεις σήμερα;', 'Διάλεξε vibe και θα βρούμε match που ταιριάζει',
     'Νέα ερώτηση! 💜', 'Κάποιος θέλει να σε γνωρίσει καλύτερα', 'Η ερώτησή σου απαντήθηκε! 🎉', 'Ο/Η {name} απάντησε στην ερώτησή σου',
+    '📹 {name} σε καλεί', 'Βιντεοκλήση — πάτησε για να απαντήσεις',
   ],
   tr: [
     'Eşleştiniz! 💜', 'Sen ve {name} birbirinizi beğendiniz!',
@@ -174,6 +191,7 @@ const ROWS: Record<string, string[]> = {
     'Eşleşmene henüz yazmadın', '{hours} saat kaldı', '🔔 Daily Match 5 dakika sonra', 'Birazdan yeni biriyle tanışacaksın',
     'Bugün modun nasıl?', 'Bir mod seç, sana uygun bir eşleşme bulalım',
     'Yeni soru! 💜', 'Biri seni daha iyi tanımak istiyor', 'Soruna yanıt geldi! 🎉', '{name} sorunu yanıtladı',
+    '📹 {name} seni arıyor', 'Görüntülü arama — yanıtlamak için dokun',
   ],
   hu: [
     'Match! 💜', 'Te és {name} tetszetek egymásnak!',
@@ -183,6 +201,7 @@ const ROWS: Record<string, string[]> = {
     'Még nem írtál a matchednek', 'Még {hours} óra', '🔔 Daily Match 5 perc múlva', 'Mindjárt megismersz valakit',
     'Milyen a hangulatod ma?', 'Válassz hangulatot, és ahhoz illő matchet keresünk',
     'Új kérdés! 💜', 'Valaki jobban meg akar ismerni', 'Válasz érkezett a kérdésedre! 🎉', '{name} válaszolt a kérdésedre',
+    '📹 {name} hív téged', 'Videohívás – koppints a fogadáshoz',
   ],
   ro: [
     'E un match! 💜', 'Tu și {name} vă plăceți!',
@@ -192,6 +211,7 @@ const ROWS: Record<string, string[]> = {
     'Încă nu i-ai scris match-ului tău', 'Mai sunt {hours} h', '🔔 Daily Match în 5 minute', 'Urmează să cunoști pe cineva nou',
     'Ce stare ai azi?', 'Alege o stare și îți găsim un match potrivit',
     'Întrebare nouă! 💜', 'Cineva vrea să te cunoască mai bine', 'Întrebarea ta a primit un răspuns! 🎉', '{name} ți-a răspuns la întrebare',
+    '📹 {name} te sună', 'Apel video — atinge pentru a răspunde',
   ],
   hr: [
     'Imaš match! 💜', 'Ti i {name} sviđate se jedno drugome!',
@@ -201,6 +221,7 @@ const ROWS: Record<string, string[]> = {
     'Još nisi pisao/la svom matchu', 'Još {hours} h', '🔔 Daily Match za 5 minuta', 'Uskoro upoznaješ nekoga novog',
     'Kakvo ti je danas raspoloženje?', 'Odaberi vibe, a mi ćemo naći match koji mu odgovara',
     'Novo pitanje! 💜', 'Netko te želi bolje upoznati', 'Na tvoje pitanje stigao je odgovor! 🎉', '{name} je odgovorio/la na tvoje pitanje',
+    '📹 {name} te zove', 'Videopoziv — dodirni za odgovor',
   ],
   id: [
     'Kalian match! 💜', 'Kamu dan {name} saling suka!',
@@ -210,6 +231,7 @@ const ROWS: Record<string, string[]> = {
     'Kamu belum menulis ke match-mu', 'Tersisa {hours} jam', '🔔 Daily Match 5 menit lagi', 'Sebentar lagi kamu bertemu orang baru',
     'Apa vibe kamu hari ini?', 'Pilih vibe dan kami carikan match yang cocok',
     'Pertanyaan baru! 💜', 'Seseorang ingin mengenalmu lebih dekat', 'Pertanyaanmu dijawab! 🎉', '{name} menjawab pertanyaanmu',
+    '📹 {name} meneleponmu', 'Panggilan video — ketuk untuk menjawab',
   ],
   ms: [
     'Anda sepadan! 💜', 'Anda dan {name} saling suka!',
@@ -219,6 +241,7 @@ const ROWS: Record<string, string[]> = {
     'Anda belum menulis kepada padanan anda', 'Tinggal {hours} jam', '🔔 Daily Match dalam 5 minit', 'Anda bakal bertemu seseorang yang baharu',
     'Apakah vibe anda hari ini?', 'Pilih vibe dan kami carikan padanan yang sesuai',
     'Soalan baharu! 💜', 'Seseorang ingin mengenali anda dengan lebih dekat', 'Soalan anda telah dijawab! 🎉', '{name} menjawab soalan anda',
+    '📹 {name} sedang memanggil anda', 'Panggilan video — ketik untuk menjawab',
   ],
   fil: [
     "It's a Match! 💜", 'Nagustuhan ninyo ni {name} ang isa’t isa!',
@@ -228,6 +251,7 @@ const ROWS: Record<string, string[]> = {
     'Hindi ka pa nagme-message sa iyong match', '{hours} oras na lang', '🔔 Daily Match sa loob ng 5 minuto', 'Malapit mo nang makilala ang isang bagong tao',
     'Ano ang vibe mo ngayon?', 'Pumili ng vibe at hahanapan ka namin ng match na bagay dito',
     'Bagong tanong! 💜', 'May gustong makakilala sa iyo nang mas mabuti', 'May sagot na ang tanong mo! 🎉', 'Sinagot ni {name} ang tanong mo',
+    '📹 Tumatawag sa iyo si {name}', 'Video call — i-tap para sagutin',
   ],
   vi: [
     'Tương hợp rồi! 💜', 'Bạn và {name} đã thích nhau!',
@@ -237,6 +261,7 @@ const ROWS: Record<string, string[]> = {
     'Bạn chưa nhắn cho người được ghép đôi', 'Còn {hours} giờ', '🔔 Daily Match sau 5 phút', 'Bạn sắp gặp một người mới',
     'Hôm nay tâm trạng của bạn thế nào?', 'Chọn một vibe, chúng tôi sẽ tìm người hợp với nó',
     'Câu hỏi mới! 💜', 'Có người muốn hiểu bạn hơn', 'Câu hỏi của bạn đã được trả lời! 🎉', '{name} đã trả lời câu hỏi của bạn',
+    '📹 {name} đang gọi cho bạn', 'Cuộc gọi video — chạm để trả lời',
   ],
   th: [
     'แมตช์แล้ว! 💜', 'คุณกับ {name} ถูกใจกันและกัน!',
@@ -246,6 +271,7 @@ const ROWS: Record<string, string[]> = {
     'คุณยังไม่ได้ทักแมตช์ของคุณ', 'เหลืออีก {hours} ชม.', '🔔 Daily Match อีก 5 นาที', 'อีกไม่นานคุณจะได้รู้จักคนใหม่',
     'วันนี้คุณรู้สึกแบบไหน?', 'เลือกไวบ์ แล้วเราจะหาแมตช์ที่เข้ากันให้',
     'คำถามใหม่! 💜', 'มีคนอยากรู้จักคุณมากขึ้น', 'คำถามของคุณได้รับคำตอบแล้ว! 🎉', '{name} ตอบคำถามของคุณแล้ว',
+    '📹 {name} กำลังโทรหาคุณ', 'วิดีโอคอล — แตะเพื่อรับสาย',
   ],
   zh: [
     '配对成功！💜', '你和 {name} 互相喜欢！',
@@ -255,6 +281,7 @@ const ROWS: Record<string, string[]> = {
     '你还没给你的配对发消息', '还剩 {hours} 小时', '🔔 Daily Match 还有 5 分钟', '你即将认识一个新朋友',
     '你今天的心情如何？', '选一个心情，我们为你匹配合适的人',
     '新问题！💜', '有人想更了解你', '你的问题有人回答了！🎉', '{name} 回答了你的问题',
+    '📹 {name} 正在呼叫你', '视频通话 — 点按接听',
   ],
   ja: [
     'マッチしました！💜', 'あなたと{name}さんがお互いにいいねしました！',
@@ -264,6 +291,7 @@ const ROWS: Record<string, string[]> = {
     'まだマッチ相手にメッセージを送っていません', '残り{hours}時間', '🔔 Daily Matchまであと5分', 'まもなく新しい人と出会えます',
     '今日の気分は？', '気分を選ぶと、それに合うマッチを探します',
     '新しい質問！💜', 'あなたのことをもっと知りたい人がいます', '質問に回答が届きました！🎉', '{name}さんがあなたの質問に答えました',
+    '📹 {name}さんから着信', 'ビデオ通話 — タップして応答',
   ],
   ko: [
     '매칭 성공! 💜', '당신과 {name}님이 서로 좋아요를 눌렀어요!',
@@ -273,6 +301,7 @@ const ROWS: Record<string, string[]> = {
     '아직 매칭 상대에게 메시지를 보내지 않았어요', '{hours}시간 남음', '🔔 Daily Match 5분 전', '곧 새로운 사람을 만나요',
     '오늘 기분은 어때요?', '바이브를 고르면 어울리는 상대를 찾아 드려요',
     '새 질문! 💜', '누군가 당신을 더 알고 싶어해요', '질문에 답변이 달렸어요! 🎉', '{name}님이 질문에 답했어요',
+    '📹 {name}님이 전화하고 있어요', '영상 통화 — 탭하여 받기',
   ],
   ar: [
     'حصل تطابق! 💜', 'أُعجبتَ أنت و{name} ببعضكما!',
@@ -282,6 +311,7 @@ const ROWS: Record<string, string[]> = {
     'لم تراسل تطابقك بعد', 'بقي {hours} ساعة', '🔔 التطابق اليومي بعد 5 دقائق', 'ستتعرف قريبًا على شخص جديد',
     'ما مزاجك اليوم؟', 'اختر مزاجك وسنجد لك تطابقًا يناسبه',
     'سؤال جديد! 💜', 'شخص ما يريد أن يعرفك أكثر', 'تلقى سؤالك إجابة! 🎉', 'أجاب {name} على سؤالك',
+    '📹 {name} يتصل بك', 'مكالمة فيديو — اضغط للرد',
   ],
   he: [
     'יש התאמה! 💜', 'את/ה ו{name} אהבתם זה את זה!',
@@ -291,6 +321,7 @@ const ROWS: Record<string, string[]> = {
     'עוד לא כתבת להתאמה שלך', 'נשארו {hours} שעות', '🔔 Daily Match בעוד 5 דקות', 'עוד רגע תכירו מישהו חדש',
     'מה הווייב שלך היום?', 'בחר/י ווייב ונמצא התאמה שמתאימה לו',
     'שאלה חדשה! 💜', 'מישהו רוצה להכיר אותך טוב יותר', 'השאלה שלך קיבלה תשובה! 🎉', '{name} ענה/תה על השאלה שלך',
+    '📹 {name} מתקשר/ת אליך', 'שיחת וידאו — הקש/י כדי לענות',
   ],
   fa: [
     'مچ شدید! 💜', 'شما و {name} از هم خوشتان آمد!',
@@ -300,6 +331,7 @@ const ROWS: Record<string, string[]> = {
     'هنوز به مچ خود پیام نداده‌اید', '{hours} ساعت باقی مانده', '🔔 Daily Match تا ۵ دقیقه دیگر', 'به‌زودی با فرد جدیدی آشنا می‌شوید',
     'امروز حال‌وهوایتان چطور است؟', 'یک حال‌وهوا انتخاب کنید تا مچ مناسبش را پیدا کنیم',
     'سؤال جدید! 💜', 'کسی می‌خواهد شما را بهتر بشناسد', 'به سؤال شما پاسخ داده شد! 🎉', '{name} به سؤال شما پاسخ داد',
+    '📹 {name} با شما تماس می‌گیرد', 'تماس تصویری — برای پاسخ ضربه بزنید',
   ],
   hi: [
     'मैच हो गया! 💜', 'आप और {name} ने एक-दूसरे को पसंद किया!',
@@ -309,6 +341,7 @@ const ROWS: Record<string, string[]> = {
     'आपने अभी तक अपने मैच को संदेश नहीं भेजा', '{hours} घंटे बाकी', '🔔 Daily Match 5 मिनट में', 'जल्द ही आप किसी नए व्यक्ति से मिलेंगे',
     'आज आपका मूड कैसा है?', 'एक वाइब चुनें, हम उसके हिसाब से मैच ढूंढेंगे',
     'नया सवाल! 💜', 'कोई आपको बेहतर जानना चाहता है', 'आपके सवाल का जवाब आया! 🎉', '{name} ने आपके सवाल का जवाब दिया',
+    '📹 {name} आपको कॉल कर रहे हैं', 'वीडियो कॉल — जवाब देने के लिए टैप करें',
   ],
   bn: [
     'ম্যাচ হয়েছে! 💜', 'আপনি আর {name} একে অপরকে পছন্দ করেছেন!',
@@ -318,6 +351,7 @@ const ROWS: Record<string, string[]> = {
     'আপনি এখনও আপনার ম্যাচকে লেখেননি', '{hours} ঘণ্টা বাকি', '🔔 Daily Match ৫ মিনিট পরে', 'শিগগিরই আপনি নতুন কারও সঙ্গে পরিচিত হবেন',
     'আজ আপনার মুড কেমন?', 'একটি ভাইব বেছে নিন, আমরা মানানসই ম্যাচ খুঁজে দেব',
     'নতুন প্রশ্ন! 💜', 'কেউ আপনাকে আরও ভালো করে জানতে চায়', 'আপনার প্রশ্নের উত্তর এসেছে! 🎉', '{name} আপনার প্রশ্নের উত্তর দিয়েছেন',
+    '📹 {name} আপনাকে কল করছেন', 'ভিডিও কল — উত্তর দিতে ট্যাপ করুন',
   ],
   ta: [
     'மேட்ச் ஆனது! 💜', 'நீங்களும் {name}-உம் ஒருவரையொருவர் விரும்பினீர்கள்!',
@@ -327,6 +361,7 @@ const ROWS: Record<string, string[]> = {
     'உங்கள் மேட்சுக்கு இன்னும் எழுதவில்லை', '{hours} மணிநேரம் மீதம்', '🔔 Daily Match 5 நிமிடங்களில்', 'விரைவில் ஒரு புதிய நபரைச் சந்திப்பீர்கள்',
     'இன்று உங்கள் மனநிலை என்ன?', 'ஒரு வைப் தேர்ந்தெடுங்கள், அதற்கேற்ற மேட்சைக் கண்டுபிடிப்போம்',
     'புதிய கேள்வி! 💜', 'யாரோ உங்களை நன்கு அறிய விரும்புகிறார்', 'உங்கள் கேள்விக்குப் பதில் வந்தது! 🎉', '{name} உங்கள் கேள்விக்குப் பதிலளித்தார்',
+    '📹 {name} உங்களை அழைக்கிறார்', 'வீடியோ அழைப்பு — பதிலளிக்க தட்டவும்',
   ],
   sw: [
     'Mmelingana! 💜', 'Wewe na {name} mmependana!',
@@ -336,10 +371,16 @@ const ROWS: Record<string, string[]> = {
     'Bado hujamwandikia mlingano wako', 'Zimebaki saa {hours}', '🔔 Daily Match baada ya dakika 5', 'Karibu utakutana na mtu mpya',
     'Hali yako leo ikoje?', 'Chagua vibe nasi tutakutafutia mlingano unaofaa',
     'Swali jipya! 💜', 'Mtu anataka kukufahamu zaidi', 'Swali lako limejibiwa! 🎉', '{name} amejibu swali lako',
+    '📹 {name} anakupigia simu', 'Simu ya video — gusa ili kujibu',
   ],
 };
 
 export const PUSH_LOCALES = Object.keys(ROWS);
+
+/** For the test: a short row would quietly fall back to English for its last keys. */
+export const PUSH_ROW_LENGTHS: Record<string, number> = Object.fromEntries(
+  Object.entries(ROWS).map(([locale, row]) => [locale, row.length]),
+);
 
 /** Render a push text in `locale`, falling back to English. */
 export function pushText(locale: string | null | undefined, key: PushKey, params: Record<string, string | number> = {}): string {

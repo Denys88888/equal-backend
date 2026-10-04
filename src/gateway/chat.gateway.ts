@@ -8,6 +8,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../users/push.service';
 import { allowedOrigins } from '../common/allowed-origins';
 
 /** Socket with the identity we resolved from the handshake token. */
@@ -23,6 +24,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private jwt: JwtService,
     private prisma: PrismaService,
+    private push: PushService,
   ) {}
 
   /**
@@ -195,29 +197,121 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.to(`match:${payload.matchId}`).emit('typing:stop', { userId: client.userId });
   }
 
-  // ── WebRTC signaling ──────────────────────────────────
+  // ── Video calls ───────────────────────────────────────
+  //
+  // Every call event goes to the partner's own user room. It used to go to the
+  // match room, which only holds people who have that chat open — the person
+  // being called almost never does, so the offer went nowhere, nothing rang on
+  // their side, and the caller waited on "Connecting..." forever.
+  //
+  // Flow: caller call:invite → callee sees call:incoming → call:accept →
+  // caller sends call:offer → callee call:answer → both trade call:ice.
+  // call:cancel (caller gives up), call:decline and call:end close it.
+
+  /** The other participant of a match the socket's user belongs to; cached per socket. */
+  private async callPartner(client: AuthedSocket, matchId: unknown): Promise<string | null> {
+    if (!client.userId || typeof matchId !== 'string' || matchId.length > 64) return null;
+    const data = client.data as { callPartners?: Map<string, string> };
+    const cache = (data.callPartners ??= new Map());
+    const hit = cache.get(matchId);
+    if (hit) return hit;
+    const match = await this.prisma.match.findFirst({
+      where: { id: matchId, OR: [{ user1Id: client.userId }, { user2Id: client.userId }] },
+      select: { user1Id: true, user2Id: true },
+    });
+    if (!match) return null;
+    const partnerId = match.user1Id === client.userId ? match.user2Id : match.user1Id;
+    cache.set(matchId, partnerId);
+    return partnerId;
+  }
+
+  private async relayCall(client: AuthedSocket, matchId: unknown, event: string, extra: Record<string, unknown> = {}) {
+    const partnerId = await this.callPartner(client, matchId);
+    if (!partnerId) return { ok: false };
+    this.server.to(`user:${partnerId}`).emit(event, { matchId, fromUserId: client.userId, ...extra });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('call:invite')
+  async handleCallInvite(client: AuthedSocket, payload: { matchId: string }) {
+    const matchId = payload?.matchId;
+    const partnerId = await this.callPartner(client, matchId);
+    if (!partnerId) return { ok: false, reason: 'not_a_participant' };
+    const [caller, partner] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: client.userId },
+        select: { name: true, photos: { orderBy: [{ isMain: 'desc' }, { order: 'asc' }], take: 1, select: { url: true } } },
+      }),
+      this.prisma.user.findUnique({ where: { id: partnerId }, select: { isActive: true, isDemo: true } }),
+    ]);
+    // A fake profile has nobody behind it to pick up.
+    if (!partner?.isActive || partner.isDemo) return { ok: false, reason: 'unavailable' };
+    const name = caller?.name ?? '';
+    this.server.to(`user:${partnerId}`).emit('call:incoming', {
+      matchId,
+      fromUserId: client.userId,
+      name,
+      photo: caller?.photos?.[0]?.url ?? null,
+    });
+    const online = this.isOnline(partnerId);
+    if (!online) {
+      // App closed: ring through a push that opens straight into the answer screen.
+      this.push
+        .sendToUser(partnerId, {
+          title: 'call_title',
+          body: 'call_body',
+          params: { name },
+          url: `/#/video/${matchId}?answer=1`,
+          tag: `call-${matchId}`,
+        })
+        .catch(() => {});
+    }
+    return { ok: true, online };
+  }
+
+  @SubscribeMessage('call:cancel')
+  handleCallCancel(client: AuthedSocket, payload: { matchId: string }) {
+    return this.relayCall(client, payload?.matchId, 'call:cancelled');
+  }
+
+  @SubscribeMessage('call:accept')
+  handleCallAccept(client: AuthedSocket, payload: { matchId: string }) {
+    return this.relayCall(client, payload?.matchId, 'call:accepted');
+  }
+
+  @SubscribeMessage('call:decline')
+  handleCallDecline(client: AuthedSocket, payload: { matchId: string; reason?: string }) {
+    const reason = payload?.reason === 'busy' ? 'busy' : 'declined';
+    return this.relayCall(client, payload?.matchId, 'call:declined', { reason });
+  }
 
   @SubscribeMessage('call:offer')
   handleCallOffer(client: AuthedSocket, payload: { matchId: string; offer: RTCSessionDescriptionInit }) {
-    if (!this.inMatch(client, payload?.matchId)) return;
-    client.to(`match:${payload.matchId}`).emit('call:offer', { ...payload, callerId: client.userId });
+    if (!isDescription(payload?.offer, 'offer')) return { ok: false };
+    return this.relayCall(client, payload.matchId, 'call:offer', { offer: payload.offer });
   }
 
   @SubscribeMessage('call:answer')
   handleCallAnswer(client: AuthedSocket, payload: { matchId: string; answer: RTCSessionDescriptionInit }) {
-    if (!this.inMatch(client, payload?.matchId)) return;
-    client.to(`match:${payload.matchId}`).emit('call:answer', payload);
+    if (!isDescription(payload?.answer, 'answer')) return { ok: false };
+    return this.relayCall(client, payload.matchId, 'call:answer', { answer: payload.answer });
   }
 
   @SubscribeMessage('call:ice')
   handleCallIce(client: AuthedSocket, payload: { matchId: string; candidate: RTCIceCandidateInit }) {
-    if (!this.inMatch(client, payload?.matchId)) return;
-    client.to(`match:${payload.matchId}`).emit('call:ice', payload);
+    const candidate = payload?.candidate;
+    if (!candidate || typeof candidate !== 'object' || JSON.stringify(candidate).length > 2000) return { ok: false };
+    return this.relayCall(client, payload.matchId, 'call:ice', { candidate });
   }
 
   @SubscribeMessage('call:end')
   handleCallEnd(client: AuthedSocket, payload: { matchId: string }) {
-    if (!this.inMatch(client, payload?.matchId)) return;
-    client.to(`match:${payload.matchId}`).emit('call:end', {});
+    return this.relayCall(client, payload?.matchId, 'call:end');
   }
+}
+
+/** An SDP of the expected type and a sane size — relayed as-is to the partner. */
+function isDescription(value: unknown, type: 'offer' | 'answer'): value is RTCSessionDescriptionInit {
+  const d = value as RTCSessionDescriptionInit | undefined;
+  return !!d && d.type === type && typeof d.sdp === 'string' && d.sdp.length > 0 && d.sdp.length <= 20000;
 }

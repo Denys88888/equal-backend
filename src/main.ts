@@ -12,6 +12,7 @@ import { paymentDiagnostics } from './common/payment-diagnostics';
 import * as path from 'path';
 import * as fs from 'fs';
 import { audioUploadDiagnostics } from './common/audio-upload';
+import { turnDiagnostics } from './gateway/ice-servers';
 import { cloudinaryDiagnostics } from './upload/upload.service';
 
 async function bootstrap() {
@@ -70,6 +71,9 @@ async function bootstrap() {
       // then go to the database instead of failing.
       cloudinary_last_error: cloudinaryDiagnostics(),
       audio_last: audioUploadDiagnostics(),
+      // Video-call relay: without TURN, calls between phones on mobile data
+      // ring and never connect.
+      turn: turnDiagnostics(),
     });
   });
 

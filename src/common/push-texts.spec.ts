@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PUSH_KEYS, PUSH_LOCALES, pushText } from './push-texts';
+import { PUSH_KEYS, PUSH_LOCALES, PUSH_ROW_LENGTHS, pushText } from './push-texts';
 
 /** A missing row or a dropped {name} would put a blank into someone's lock screen. */
 describe('push texts', () => {
@@ -13,6 +13,7 @@ describe('push texts', () => {
   });
 
   it.each(PUSH_LOCALES)('%s has every key, with the same placeholders as English', (locale) => {
+    expect(PUSH_ROW_LENGTHS[locale], `${locale} row length`).toBe(PUSH_KEYS.length);
     for (const key of PUSH_KEYS) {
       const raw = pushText(locale, key, { name: '{name}', hours: '{hours}' });
       const en = pushText('en', key, { name: '{name}', hours: '{hours}' });
