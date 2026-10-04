@@ -6,9 +6,23 @@ type UploadKind = 'photo' | 'audio' | 'verification';
 
 let lastCloudinaryError: { at: string; message: string } | null = null;
 
+/**
+ * Credential errors don't fix themselves: once Cloudinary rejects our key or
+ * signature, every later upload would fail the same way first. Stop trying
+ * until the next restart (a credentials change on Render restarts the service).
+ */
+const CREDENTIAL_ERROR = /invalid signature|invalid api[_ ]key|unknown api[_ ]key|invalid cloud[_ ]name|must supply api_key/i;
+let cloudinaryDisabled = false;
+
 /** The last Cloudinary failure (message only), shown on /v1/health. */
 export function cloudinaryDiagnostics() {
-  return lastCloudinaryError;
+  return lastCloudinaryError ? { ...lastCloudinaryError, disabledUntilRestart: cloudinaryDisabled } : null;
+}
+
+/** Test hook: start each test with Cloudinary enabled again. */
+export function resetCloudinaryState() {
+  cloudinaryDisabled = false;
+  lastCloudinaryError = null;
 }
 
 /**
@@ -65,7 +79,7 @@ export class UploadService {
     _kind: UploadKind,
     options: Record<string, unknown>,
   ): Promise<string> {
-    if (this.useCloudinary) {
+    if (this.useCloudinary && !cloudinaryDisabled) {
       try {
         const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(options, (err, res) => {
@@ -78,6 +92,7 @@ export class UploadService {
       } catch (err) {
         const message = String((err as { message?: string })?.message ?? err).slice(0, 300);
         lastCloudinaryError = { at: new Date().toISOString(), message };
+        if (CREDENTIAL_ERROR.test(message)) cloudinaryDisabled = true;
         console.error('[upload] Cloudinary failed, storing in the database instead:', message);
       }
     }

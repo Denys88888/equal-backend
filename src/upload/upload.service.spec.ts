@@ -13,7 +13,8 @@ const file = { buffer: Buffer.from('abc'), mimetype: 'audio/webm', size: 3, orig
 
 describe('UploadService', () => {
   const env = { ...process.env };
-  beforeEach(() => {
+  beforeEach(async () => {
+    (await import('./upload.service')).resetCloudinaryState();
     uploadStream.mockReset();
     process.env.RENDER_EXTERNAL_URL = 'https://api.example';
   });
@@ -42,6 +43,26 @@ describe('UploadService', () => {
     expect(create.mock.calls[0][0].data).toMatchObject({ ownerId: 'u1', mimeType: 'audio/webm', size: 3 });
     const { cloudinaryDiagnostics } = await import('./upload.service');
     expect(cloudinaryDiagnostics()?.message).toContain('Invalid Signature');
+    log.mockRestore();
+  });
+
+  it('stops calling Cloudinary after a credential error, until restart', async () => {
+    uploadStream.mockImplementation((_o, cb) => ({ end: () => cb({ message: 'Invalid Signature abc' }) }));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { service } = await make(true);
+    await service.uploadAudio(file, 'u1');
+    await service.uploadAudio(file, 'u1');
+    expect(uploadStream).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it('keeps trying Cloudinary after a transient (non-credential) error', async () => {
+    uploadStream.mockImplementation((_o, cb) => ({ end: () => cb({ message: 'Request Timeout' }) }));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { service } = await make(true);
+    await service.uploadAudio(file, 'u1');
+    await service.uploadAudio(file, 'u1');
+    expect(uploadStream).toHaveBeenCalledTimes(2);
     log.mockRestore();
   });
 
