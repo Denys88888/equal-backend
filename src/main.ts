@@ -12,6 +12,7 @@ import { paymentDiagnostics } from './common/payment-diagnostics';
 import * as path from 'path';
 import * as fs from 'fs';
 import { audioUploadDiagnostics } from './common/audio-upload';
+import { cloudinaryDiagnostics } from './upload/upload.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -64,7 +65,10 @@ async function bootstrap() {
       // Where uploads go. "local" is Render's disk, which every deploy wipes —
       // photos and voice clips stored there disappear on the next release.
       uploads: process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET
-        ? 'cloudinary' : 'local',
+        ? 'cloudinary' : 'database',
+      // Set when Cloudinary refused an upload (e.g. a wrong API secret); files
+      // then go to the database instead of failing.
+      cloudinary_last_error: cloudinaryDiagnostics(),
       audio_last: audioUploadDiagnostics(),
     });
   });

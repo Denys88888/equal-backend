@@ -1,13 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
-import * as path from 'path';
-import * as fs from 'fs';
+import { PrismaService } from '../prisma/prisma.service';
 
+type UploadKind = 'photo' | 'audio' | 'verification';
+
+let lastCloudinaryError: { at: string; message: string } | null = null;
+
+/** The last Cloudinary failure (message only), shown on /v1/health. */
+export function cloudinaryDiagnostics() {
+  return lastCloudinaryError;
+}
+
+/**
+ * Stores uploaded media. Cloudinary when it is configured and accepts the
+ * upload; otherwise the file is kept in the database (StoredFile) and served
+ * by GET /v1/files/:id.
+ *
+ * Until 2026-10-04 a Cloudinary failure was simply thrown: with a wrong
+ * CLOUDINARY_API_SECRET on Render ("Invalid Signature"), every profile photo,
+ * voice intro, chat image, voice message and verification selfie failed to
+ * save. When Cloudinary was not configured the fallback wrote to Render's
+ * local disk, which every deploy wipes.
+ */
 @Injectable()
 export class UploadService {
   private readonly useCloudinary: boolean;
 
-  constructor() {
+  constructor(private prisma: PrismaService) {
     const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
     this.useCloudinary = !!(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
     if (this.useCloudinary) {
@@ -19,64 +38,65 @@ export class UploadService {
     }
   }
 
-  async uploadPhoto(file: Express.Multer.File, userId: string): Promise<string> {
-    if (this.useCloudinary) {
-      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: `equal/${userId}`, resource_type: 'image', transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }] },
-          (err, res) => { if (err || !res) reject(err); else resolve(res); },
-        );
-        uploadStream.end(file.buffer);
-      });
-      return result.secure_url;
-    }
-    return this.saveLocal(file);
+  uploadPhoto(file: Express.Multer.File, userId: string): Promise<string> {
+    return this.store(file, userId, 'photo', {
+      folder: `equal/${userId}`,
+      resource_type: 'image',
+      transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
+    });
   }
 
   /** Voice notes. Cloudinary serves audio under resource_type 'video'. */
-  async uploadAudio(file: Express.Multer.File, userId: string): Promise<string> {
-    if (this.useCloudinary) {
-      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: `equal/${userId}/voice`, resource_type: 'video' },
-          (err, res) => { if (err || !res) reject(err); else resolve(res); },
-        );
-        uploadStream.end(file.buffer);
-      });
-      return result.secure_url;
-    }
-    return this.saveLocal(file);
+  uploadAudio(file: Express.Multer.File, userId: string): Promise<string> {
+    return this.store(file, userId, 'audio', { folder: `equal/${userId}/voice`, resource_type: 'video' });
   }
 
   /**
-   * Verification media (a short selfie video or still). Kept in a private-ish
-   * folder — it is only ever shown to admins during review, never on a profile.
+   * Verification media (a short selfie video or still). Only ever shown to
+   * admins during review, never on a profile.
    */
-  async uploadVerificationMedia(file: Express.Multer.File, userId: string): Promise<string> {
-    if (this.useCloudinary) {
-      const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: `equal/${userId}/verification`, resource_type: 'auto' },
-          (err, res) => { if (err || !res) reject(err); else resolve(res); },
-        );
-        uploadStream.end(file.buffer);
-      });
-      return result.secure_url;
-    }
-    return this.saveLocal(file);
+  uploadVerificationMedia(file: Express.Multer.File, userId: string): Promise<string> {
+    return this.store(file, userId, 'verification', { folder: `equal/${userId}/verification`, resource_type: 'auto' });
   }
 
-  /** Fallback: save to local /uploads (development / Render without Cloudinary) */
-  private saveLocal(file: Express.Multer.File): string {
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    const safeName = (file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const filename = `${Date.now()}-${safeName}`;
-    fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
-    // Must be absolute: the frontend is a separate origin (equal-app.onrender.com),
-    // so a bare "/uploads/..." path resolves against the FRONTEND's origin in an
-    // <img> tag and 404s there — only this backend actually serves /uploads.
+  private async store(
+    file: Express.Multer.File,
+    userId: string,
+    _kind: UploadKind,
+    options: Record<string, unknown>,
+  ): Promise<string> {
+    if (this.useCloudinary) {
+      try {
+        const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(options, (err, res) => {
+            if (err || !res) reject(err ?? new Error('Empty Cloudinary response'));
+            else resolve(res);
+          });
+          uploadStream.end(file.buffer);
+        });
+        return result.secure_url;
+      } catch (err) {
+        const message = String((err as { message?: string })?.message ?? err).slice(0, 300);
+        lastCloudinaryError = { at: new Date().toISOString(), message };
+        console.error('[upload] Cloudinary failed, storing in the database instead:', message);
+      }
+    }
+    return this.saveToDatabase(file, userId);
+  }
+
+  private async saveToDatabase(file: Express.Multer.File, userId: string): Promise<string> {
+    const stored = await this.prisma.storedFile.create({
+      data: {
+        ownerId: userId,
+        mimeType: file.mimetype || 'application/octet-stream',
+        size: file.size ?? file.buffer.length,
+        data: file.buffer,
+      },
+      select: { id: true },
+    });
+    // Absolute: the frontend is a different origin, so a bare path would
+    // resolve against it and 404.
     const base = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`;
-    return `${base}/uploads/${filename}`;
+    return `${base}/v1/files/${stored.id}`;
   }
 }

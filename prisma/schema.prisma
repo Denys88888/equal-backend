@@ -78,6 +78,7 @@ model User {
   createdClubs Club[] @relation("ClubCreator")
   createdEvents Event[] @relation("EventCreator")
   eventFeedback EventFeedback[]
+  storedFiles   StoredFile[]
   dailyMatchesA DailyMatch[] @relation("DailyMatchUserA")
   dailyMatchesB DailyMatch[] @relation("DailyMatchUserB")
   dailyMatchMessages DailyMatchMessage[]
@@ -555,4 +556,20 @@ enum PaymentStatus {
   APPROVED
   COMPLETED
   CANCELLED
+}
+
+// Uploaded media kept in the database when Cloudinary is unavailable or
+// misconfigured. The old fallback wrote to Render's local disk, which every
+// deploy wipes; this survives deploys and is served by GET /v1/files/:id.
+model StoredFile {
+  id        String   @id @default(cuid())
+  ownerId   String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  owner     User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
 }
