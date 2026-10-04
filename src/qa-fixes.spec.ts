@@ -47,9 +47,9 @@ describe('Extra Daily Match — pay only for what can be delivered', () => {
     await expect(service.getExtraStatus('me')).resolves.toEqual({ hasCredit: false, available: false, reason: 'no_candidates' });
   });
 
-  it('refuses a buyer without a voice intro before they pay', async () => {
+  it('does not require a voice intro (it is optional)', async () => {
     const { service } = dailyMatch({ voiceIntro: false, others: [WOMAN] });
-    await expect(service.getExtraStatus('me')).resolves.toMatchObject({ available: false, reason: 'voice_intro' });
+    await expect(service.getExtraStatus('me')).resolves.toEqual({ hasCredit: false, available: true, reason: null });
   });
 
   it('reports an unused paid extra so the app claims it instead of charging again', async () => {

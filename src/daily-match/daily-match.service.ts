@@ -113,9 +113,11 @@ export class DailyMatchService {
   }
 
   /**
-   * Everyone who *could* be matched right now: active, not banned, and with a
-   * Voice Intro recorded (the spec makes it mandatory — a profile without one
-   * is inert). Users already holding a live match today are excluded.
+   * Everyone who *could* be matched right now: active, not banned, not hidden,
+   * not a fake profile. The Voice Intro is optional (owner's decision,
+   * 2026-10-04): requiring it left anyone who skipped the recorder — or whose
+   * recording failed to save — silently out of every pairing. Users already
+   * holding a live match today are excluded.
    */
   private async loadEligibleUsers() {
     const now = new Date();
@@ -124,7 +126,6 @@ export class DailyMatchService {
         isActive: true,
         ghostMode: false,
         isDemo: false,
-        voiceIntroUrl: { not: null },
         OR: [{ bannedUntil: null }, { bannedUntil: { lt: now } }],
       },
       select: {
@@ -233,19 +234,16 @@ export class DailyMatchService {
    * can refuse to take 0.2 Pi for a match that cannot be delivered.
    */
   private async findExtraCandidate(userId: string): Promise<
-    { candidate: Candidate; reason: null } | { candidate: null; reason: 'voice_intro' | 'no_candidates' }
+    { candidate: Candidate; reason: null } | { candidate: null; reason: 'no_candidates' }
   > {
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true, name: true, verified: true, trustScore: true, languages: true, dailyVibe: true,
-        voiceIntroUrl: true,
         profile: { select: { gender: true, lookingFor: true, interests: true } },
       },
     });
     if (!me) throw new NotFoundException('User not found');
-    // Daily Match requires a Voice Intro from everyone, the buyer included.
-    if (!me.voiceIntroUrl) return { candidate: null, reason: 'voice_intro' };
 
     const self: Candidate = {
       id: me.id, name: me.name, verified: me.verified, trustScore: me.trustScore,
@@ -308,11 +306,7 @@ export class DailyMatchService {
 
     const found = await this.findExtraCandidate(userId);
     if (!found.candidate) {
-      throw new BadRequestException(
-        found.reason === 'voice_intro'
-          ? 'Record a voice intro first'
-          : 'No one available right now — try again later',
-      );
+      throw new BadRequestException('No one available right now — try again later');
     }
 
     // Burn the payment only once a match is actually guaranteed — failing to
@@ -656,7 +650,7 @@ export class DailyMatchService {
     windowMinutes = 5,
   ) {
     const users = await this.prisma.user.findMany({
-      where: { isActive: true, voiceIntroUrl: { not: null } },
+      where: { isActive: true, isDemo: false },
       select: { id: true, timezone: true, dailyMatchTime: true },
     });
 
