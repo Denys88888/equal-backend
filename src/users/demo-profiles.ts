@@ -21,6 +21,8 @@ export const DEMO_PHOTOS: Record<string, string> = {
   kasia_pilot: './avatar-olivia.jpg',      // yoga instructor
   zofia_pilot: './avatar-sarah.jpg',       // café, coffee
   ola_pilot: './avatar-sophia.jpg',        // photographer
+  ania_pilot: './avatar-ania.jpg',         // salsa on weekends (Grok Imagine)
+  marta_pilot: './avatar-marta.jpg',       // home cook, pierogi (Grok Imagine)
 };
 
 /**

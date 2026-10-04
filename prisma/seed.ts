@@ -119,6 +119,8 @@ const PILOT_PHOTOS: Record<string, string> = {
   kasia_pilot: './avatar-olivia.jpg',
   zofia_pilot: './avatar-sarah.jpg',
   ola_pilot: './avatar-sophia.jpg',
+  ania_pilot: './avatar-ania.jpg',
+  marta_pilot: './avatar-marta.jpg',
 };
 
 const NAMES: { name: string; gender: 'female' | 'male'; interests: string[]; goal: string; bioCore: string }[] = [
