@@ -211,6 +211,7 @@ export class ProfilesService {
       photo: target.photos[0]?.url || '',
       photos: target.photos.map((p) => p.url),
       bio: target.profile?.bio || '',
+      videoIntroUrl: target.videoIntroUrl ?? null,
       interests: theirInterests,
       verified: target.verified ?? false,
       isDemo: target.isDemo ?? false,

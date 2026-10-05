@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -63,6 +63,44 @@ export class UploadService {
   /** Voice notes. Cloudinary serves audio under resource_type 'video'. */
   uploadAudio(file: Express.Multer.File, userId: string): Promise<string> {
     return this.store(file, userId, 'audio', { folder: `equal/${userId}/voice`, resource_type: 'video' });
+  }
+
+  /**
+   * Profile video intro. Cloudinary only: a video is too big for the database
+   * fallback. Converted while uploading to H.264/AAC MP4, at most 720 px wide —
+   * Android records WebM and iPhone records HEVC .mov, and neither plays on
+   * the other platform.
+   */
+  async uploadVideo(file: Express.Multer.File, userId: string): Promise<{ url: string; duration: number | null; publicId: string }> {
+    if (!this.useCloudinary || cloudinaryDisabled) {
+      throw new ServiceUnavailableException('Video uploads are unavailable right now');
+    }
+    try {
+      const res = await new Promise<{ secure_url: string; public_id: string; duration?: number; eager?: { secure_url: string }[] }>((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: `equal/${userId}/video`,
+            resource_type: 'video',
+            eager: [{ width: 720, crop: 'limit', video_codec: 'h264', audio_codec: 'aac', quality: 'auto', format: 'mp4' }],
+          },
+          (err, out) => (err || !out ? reject(err ?? new Error('Empty Cloudinary response')) : resolve(out as never)),
+        );
+        stream.end(file.buffer);
+      });
+      return { url: res.eager?.[0]?.secure_url ?? res.secure_url, duration: res.duration ?? null, publicId: res.public_id };
+    } catch (err) {
+      const message = String((err as { message?: string })?.message ?? err).slice(0, 300);
+      lastCloudinaryError = { at: new Date().toISOString(), message };
+      if (CREDENTIAL_ERROR.test(message)) cloudinaryDisabled = true;
+      console.error('[upload] video upload failed:', message);
+      throw new ServiceUnavailableException('Could not store the video');
+    }
+  }
+
+  /** Best effort: a leftover video only costs storage. */
+  async deleteVideo(publicId: string): Promise<void> {
+    if (!this.useCloudinary) return;
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'video' }).catch(() => {});
   }
 
   /**

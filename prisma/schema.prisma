@@ -33,6 +33,7 @@ model User {
   bannedUntil DateTime?
   // Voice Intro is mandatory — a profile without one is excluded from matching.
   voiceIntroUrl String?
+  videoIntroUrl String?
   // Vibe Check: reset to null by the 09:00 cron, re-set by the user each day.
   dailyVibe String?
   vibeUpdatedAt DateTime?

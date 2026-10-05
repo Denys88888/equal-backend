@@ -191,6 +191,16 @@ export class UsersService {
     return { success: true };
   }
 
+  async setVideoIntro(userId: string, url: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { videoIntroUrl: url } });
+    return { videoIntroUrl: url };
+  }
+
+  async deleteVideoIntro(userId: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { videoIntroUrl: null } });
+    return { success: true };
+  }
+
   /** Daily Match delivery preferences (timezone, local time, languages). */
   /**
    * Which Profile badges the user has earned, from what they actually did.

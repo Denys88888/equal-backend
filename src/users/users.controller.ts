@@ -9,6 +9,10 @@ import { PushService } from './push.service';
 import { UpdateSettingsDto } from './users.dto';
 import { isAudioUpload, recordAudioUpload } from '../common/audio-upload';
 
+/** The app records 15 s; the margin covers a picked file or a slow stop. */
+const MAX_VIDEO_SECONDS = 30;
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024;
+
 @ApiTags('Users')
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -84,6 +88,36 @@ export class UsersController {
   @Delete('me/voice-intro')
   async deleteVoiceIntro(@Request() req: { user: { id: string } }) {
     return this.usersService.deleteVoiceIntro(req.user.id);
+  }
+
+  /**
+   * Video intro — up to 15 s, recorded in the app (Onboarding, Profile) and
+   * shown on the profile. The onboarding button used to keep the clip on the
+   * phone only: nothing was uploaded and no screen ever showed it.
+   */
+  @Post('me/video-intro')
+  @UseInterceptors(FileInterceptor('video', {
+    storage: memoryStorage(),
+    limits: { fileSize: MAX_VIDEO_BYTES },
+  }))
+  async uploadVideoIntro(
+    @Request() req: { user: { id: string } },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file?.size || !/^video\//i.test(file.mimetype || '')) {
+      throw new BadRequestException(file ? 'File must be a video' : 'No video uploaded');
+    }
+    const { url, duration, publicId } = await this.uploadService.uploadVideo(file, req.user.id);
+    if (duration !== null && duration > MAX_VIDEO_SECONDS) {
+      await this.uploadService.deleteVideo(publicId);
+      throw new BadRequestException(`Video intro must be ${MAX_VIDEO_SECONDS} seconds or shorter`);
+    }
+    return this.usersService.setVideoIntro(req.user.id, url);
+  }
+
+  @Delete('me/video-intro')
+  async deleteVideoIntro(@Request() req: { user: { id: string } }) {
+    return this.usersService.deleteVideoIntro(req.user.id);
   }
 
   /** Daily Match delivery preferences (timezone, local delivery time, languages). */
