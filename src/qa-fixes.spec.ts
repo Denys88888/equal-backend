@@ -313,3 +313,38 @@ describe('DemoProfilesBootstrap.applyDemoPhotos', () => {
     expect(update).not.toHaveBeenCalled();
   });
 });
+
+describe('DemoProfilesBootstrap.removeMalePilots', () => {
+  function boot(found: { id: string; username: string }[]) {
+    const prisma = {
+      user: { findMany: vi.fn().mockResolvedValue(found), deleteMany: vi.fn().mockReturnValue('users') },
+      message: { deleteMany: vi.fn().mockReturnValue('messages') },
+      $transaction: vi.fn().mockResolvedValue([]),
+    };
+    return { b: new DemoProfilesBootstrap(prisma as never), prisma };
+  }
+
+  it('deletes only seeded male fakes, their sent messages first', async () => {
+    const men = Array.from({ length: 15 }, (_, i) => ({ id: `m${i}`, username: `man${i}_pilot` }));
+    const { b, prisma } = boot(men);
+    await expect(b.removeMalePilots()).resolves.toBe(15);
+    const { where } = prisma.user.findMany.mock.calls[0][0];
+    expect(where.piUid).toEqual({ startsWith: 'pilot_' });
+    expect(where.isDemo).toBe(true);
+    expect(JSON.stringify(where.profile)).toContain('male');
+    expect(prisma.message.deleteMany).toHaveBeenCalledWith({ where: { senderId: { in: men.map((m) => m.id) } } });
+    expect(prisma.$transaction).toHaveBeenCalledWith(['messages', 'users']);
+  });
+
+  it('deletes nothing when the filter matches implausibly many accounts', async () => {
+    const { b, prisma } = boot(Array.from({ length: 21 }, (_, i) => ({ id: `u${i}`, username: `u${i}` })));
+    await expect(b.removeMalePilots()).resolves.toBe(0);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op once they are gone', async () => {
+    const { b, prisma } = boot([]);
+    await expect(b.removeMalePilots()).resolves.toBe(0);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
