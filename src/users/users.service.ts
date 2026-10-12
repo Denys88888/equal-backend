@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service';
 import { SETTINGS_SELECT, UpdateSettingsDto } from './users.dto';
 import { RewardsService } from '../sparks/rewards.service';
+import { countGiftsReceived } from '../messages/gift-catalog';
 
 const ALLOWED_USER_FIELDS = ['name', 'avatar'];
 const ALLOWED_PROFILE_FIELDS = ['bio', 'birthDate', 'city', 'latitude', 'longitude', 'gender', 'lookingFor', 'goals', 'interests'];
@@ -189,6 +190,10 @@ export class UsersService {
   async deleteVoiceIntro(userId: string) {
     await this.prisma.user.update({ where: { id: userId }, data: { voiceIntroUrl: null } });
     return { success: true };
+  }
+
+  getGiftsReceived(userId: string) {
+    return countGiftsReceived(this.prisma, userId);
   }
 
   async setVideoIntro(userId: string, url: string) {

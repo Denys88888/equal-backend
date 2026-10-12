@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { recordPayment } from '../common/payment-diagnostics';
@@ -135,6 +136,57 @@ export class PaymentsService {
 
     recordPayment('approve', { paymentId, outcome: 'ok', linked: !!payment });
     return piData;
+  }
+
+  /**
+   * Turns a completed gift payment into the right to send one paid gift.
+   *
+   * Paid gifts used to need no payment at all: the message was created from
+   * whatever giftType the app sent. The amount is checked with Pi, not on our
+   * row (whose amount the app chose when creating it), and the payment is
+   * marked used so it buys exactly one gift.
+   *
+   * @param piPaymentId — the Pi payment id the app got back from the payment.
+   */
+  async redeemForGift(userId: string, piPaymentId: string | undefined, minAmount: number): Promise<void> {
+    if (typeof piPaymentId !== 'string' || !piPaymentId) {
+      throw new BadRequestException('A paid gift needs a completed payment');
+    }
+    const row = await this.prisma.payment.findFirst({ where: { piPaymentId, userId } });
+    // Gift payments only: a ticket or extra-match payment must not double as a gift.
+    if (!row || !row.memo.startsWith('Gift:')) throw new BadRequestException('Gift payment not found');
+    if (row.consumedAt) throw new BadRequestException('This payment was already used for a gift');
+
+    let pi: {
+      amount?: number;
+      metadata?: { paymentIdentifier?: string };
+      status?: { developer_completed?: boolean; cancelled?: boolean; user_cancelled?: boolean };
+    };
+    try {
+      const res = await this.piApiFetch(`${PI_API_BASE}/payments/${encodeURIComponent(piPaymentId)}`, {
+        headers: { Authorization: `Key ${this.apiKey}` },
+      });
+      if (!res.ok) throw new Error(`Pi answered ${res.status}`);
+      pi = await res.json();
+    } catch (err) {
+      console.error(`[payments] gift check failed piId=${piPaymentId}`, err);
+      throw new ServiceUnavailableException('Could not check the payment with Pi, try again');
+    }
+    if (!pi.status?.developer_completed || pi.status.cancelled || pi.status.user_cancelled) {
+      throw new BadRequestException('Gift payment is not completed');
+    }
+    if (pi.metadata?.paymentIdentifier && pi.metadata.paymentIdentifier !== row.id) {
+      throw new BadRequestException('Gift payment not found');
+    }
+    if (typeof pi.amount !== 'number' || pi.amount + 1e-9 < minAmount) {
+      throw new BadRequestException('Payment is less than the price of this gift');
+    }
+    // Conditional, so two requests with the same payment produce one gift.
+    const claimed = await this.prisma.payment.updateMany({
+      where: { id: row.id, consumedAt: null },
+      data: { consumedAt: new Date(), status: 'COMPLETED' },
+    });
+    if (claimed.count === 0) throw new BadRequestException('This payment was already used for a gift');
   }
 
   /**

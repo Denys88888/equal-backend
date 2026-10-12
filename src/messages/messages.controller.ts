@@ -30,9 +30,9 @@ export class MessagesController {
   async sendMessage(
     @Request() req: { user: { id: string } },
     @Param('matchId') matchId: string,
-    @Body() body: { content: string; type?: string; giftType?: string },
+    @Body() body: { content: string; type?: string; giftType?: string; paymentId?: string },
   ) {
-    return this.messagesService.create(matchId, req.user.id, body.content, body.type, body.giftType);
+    return this.messagesService.create(matchId, req.user.id, body.content, body.type, body.giftType, body.paymentId);
   }
 
   @Post('voice')

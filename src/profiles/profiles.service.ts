@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { PushService } from '../users/push.service';
 import { RewardsService } from '../sparks/rewards.service';
+import { countGiftsReceived } from '../messages/gift-catalog';
 
 @Injectable()
 export class ProfilesService {
@@ -181,7 +182,7 @@ export class ProfilesService {
     });
     if (blocked) throw new NotFoundException('Profile not found');
 
-    const [target, myProfile, myMatches, myLike] = await Promise.all([
+    const [target, myProfile, myMatches, myLike, giftsReceived] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: targetId, isActive: true },
         include: { profile: true, photos: { orderBy: { order: 'asc' } } },
@@ -192,6 +193,7 @@ export class ProfilesService {
         select: { id: true },
       }),
       this.prisma.swipeAction.findUnique({ where: { userId_targetId: { userId: viewerId, targetId } } }),
+      countGiftsReceived(this.prisma, targetId),
     ]);
     if (!target) throw new NotFoundException('Profile not found');
 
@@ -212,6 +214,7 @@ export class ProfilesService {
       photos: target.photos.map((p) => p.url),
       bio: target.profile?.bio || '',
       videoIntroUrl: target.videoIntroUrl ?? null,
+      giftsReceived,
       interests: theirInterests,
       verified: target.verified ?? false,
       isDemo: target.isDemo ?? false,

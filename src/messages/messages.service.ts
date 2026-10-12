@@ -1,7 +1,9 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushService } from '../users/push.service';
 import { ChatGateway } from '../gateway/chat.gateway';
+import { PaymentsService } from '../payments/payments.service';
+import { GIFT_PRICES, isGiftKind } from './gift-catalog';
 
 @Injectable()
 export class MessagesService {
@@ -9,6 +11,7 @@ export class MessagesService {
     private prisma: PrismaService,
     private push: PushService,
     private gateway: ChatGateway,
+    private payments: PaymentsService,
   ) {}
 
   private async verifyParticipant(matchId: string, userId: string) {
@@ -109,14 +112,19 @@ export class MessagesService {
     };
   }
 
-  async create(matchId: string, senderId: string, content: string, type = 'TEXT', giftType?: string) {
+  async create(matchId: string, senderId: string, content: string, type = 'TEXT', giftType?: string, paymentId?: string) {
     const match = await this.verifyParticipant(matchId, senderId);
     const recipientId = match.user1Id === senderId ? match.user2Id : match.user1Id;
     await this.assertNotBlocked(matchId, senderId, recipientId);
 
     const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'IMAGE' | 'GIFT' | 'SYSTEM';
+    if (msgType === 'GIFT') {
+      if (!isGiftKind(giftType)) throw new BadRequestException('Unknown gift');
+      const price = GIFT_PRICES[giftType];
+      if (price > 0) await this.payments.redeemForGift(senderId, paymentId, price);
+    }
     const message = await this.prisma.message.create({
-      data: { matchId, senderId, content, type: msgType, giftType: giftType ?? null },
+      data: { matchId, senderId, content, type: msgType, giftType: msgType === 'GIFT' ? giftType : null },
     });
 
     // Real-time delivery: the REST route is the only path the client uses to send,
