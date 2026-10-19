@@ -160,7 +160,7 @@ export class PaymentsService {
     let pi: {
       amount?: number;
       metadata?: { paymentIdentifier?: string };
-      status?: { developer_completed?: boolean; cancelled?: boolean; user_cancelled?: boolean };
+      status?: { developer_completed?: boolean; transaction_verified?: boolean; cancelled?: boolean; user_cancelled?: boolean };
     };
     try {
       const res = await this.piApiFetch(`${PI_API_BASE}/payments/${encodeURIComponent(piPaymentId)}`, {
@@ -172,7 +172,11 @@ export class PaymentsService {
       console.error(`[payments] gift check failed piId=${piPaymentId}`, err);
       throw new ServiceUnavailableException('Could not check the payment with Pi, try again');
     }
-    if (!pi.status?.developer_completed || pi.status.cancelled || pi.status.user_cancelled) {
+    // The app asks for the gift right after our complete() call, and Pi's own
+    // record can still say developer_completed=false for a moment. A verified
+    // blockchain transaction means the Pi has moved, so that is enough.
+    const moved = pi.status?.developer_completed || pi.status?.transaction_verified;
+    if (!moved || pi.status?.cancelled || pi.status?.user_cancelled) {
       throw new BadRequestException('Gift payment is not completed');
     }
     if (pi.metadata?.paymentIdentifier && pi.metadata.paymentIdentifier !== row.id) {

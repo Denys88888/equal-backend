@@ -4,6 +4,7 @@ import { PushService } from '../users/push.service';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { PaymentsService } from '../payments/payments.service';
 import { GIFT_PRICES, isGiftKind } from './gift-catalog';
+import { recordGift } from './gift-diagnostics';
 
 @Injectable()
 export class MessagesService {
@@ -119,13 +120,25 @@ export class MessagesService {
 
     const msgType = type.toUpperCase() as 'TEXT' | 'VOICE' | 'IMAGE' | 'GIFT' | 'SYSTEM';
     if (msgType === 'GIFT') {
-      if (!isGiftKind(giftType)) throw new BadRequestException('Unknown gift');
+      if (!isGiftKind(giftType)) {
+        recordGift(giftType, 'rejected', 'Unknown gift');
+        throw new BadRequestException('Unknown gift');
+      }
       const price = GIFT_PRICES[giftType];
-      if (price > 0) await this.payments.redeemForGift(senderId, paymentId, price);
+      if (price > 0) {
+        try {
+          await this.payments.redeemForGift(senderId, paymentId, price);
+        } catch (err) {
+          recordGift(giftType, 'rejected', (err as Error)?.message, paymentId);
+          console.error(`[gifts] ${giftType} refused: ${(err as Error)?.message}`);
+          throw err;
+        }
+      }
     }
     const message = await this.prisma.message.create({
       data: { matchId, senderId, content, type: msgType, giftType: msgType === 'GIFT' ? giftType : null },
     });
+    if (msgType === 'GIFT') recordGift(giftType, 'ok', undefined, paymentId);
 
     // Real-time delivery: the REST route is the only path the client uses to send,
     // so it must be what emits. Without this the partner sees nothing until reload.

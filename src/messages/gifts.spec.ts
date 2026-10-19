@@ -78,6 +78,11 @@ describe('PaymentsService.redeemForGift', () => {
     await expect(service.redeemForGift('alice', 'pi_1', 10)).rejects.toThrow(/less than the price/);
   });
 
+  it('accepts a payment whose transaction is verified while Pi still catches up on developer_completed', async () => {
+    const { service } = payments(row, { amount: 2, metadata: { paymentIdentifier: 'row1' }, status: { developer_completed: false, transaction_verified: true } });
+    await expect(service.redeemForGift('alice', 'pi_1', 2)).resolves.toBeUndefined();
+  });
+
   it('refuses a payment Pi has not completed', async () => {
     const { service } = payments(row, { amount: 2, status: { developer_completed: false } });
     await expect(service.redeemForGift('alice', 'pi_1', 2)).rejects.toThrow(/not completed/);

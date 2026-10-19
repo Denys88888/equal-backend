@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { audioUploadDiagnostics } from './common/audio-upload';
 import { turnDiagnostics } from './gateway/ice-servers';
+import { giftDiagnostics } from './messages/gift-diagnostics';
 import { cloudinaryDiagnostics } from './upload/upload.service';
 
 async function bootstrap() {
@@ -60,6 +61,8 @@ async function bootstrap() {
       ts: Date.now(),
       pi_api: piApiStatus(),
       payments_last: paymentDiagnostics(),
+      // Last gift send: why a paid gift was refused, if it was.
+      gift_last: giftDiagnostics(),
       // Whether Web Push can send at all — both VAPID keys must be set. Only a
       // boolean, never the keys.
       push_configured: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
