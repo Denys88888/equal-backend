@@ -15,6 +15,7 @@ import { audioUploadDiagnostics } from './common/audio-upload';
 import { turnDiagnostics } from './gateway/ice-servers';
 import { giftDiagnostics } from './messages/gift-diagnostics';
 import { cloudinaryDiagnostics } from './upload/upload.service';
+import { clientErrorDiagnostics } from './common/client-errors';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -77,6 +78,9 @@ async function bootstrap() {
       // Video-call relay: without TURN, calls between phones on mobile data
       // ring and never connect.
       turn: turnDiagnostics(),
+      // Crashes the app reported from phones (Pi Browser has no readable
+      // console): newest first, no user data.
+      client_errors: clientErrorDiagnostics(),
     });
   });
 

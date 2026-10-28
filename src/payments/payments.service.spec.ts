@@ -146,6 +146,48 @@ describe('PaymentsService — payment ownership', () => {
     });
   });
 
+  it('approve records what Pi charged, not the amount the app put on our row', async () => {
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'row1', userId: OWNER, status: 'PENDING', amount: 0.2, memo: 'Equal Ask' });
+    const prisma = makePrisma({ payment: { findFirst } });
+    fetchSpy.mockResolvedValue(piOk({ amount: 0.0001, memo: 'cheap', metadata: { paymentIdentifier: 'row1' } }));
+    const service = new PaymentsService(prisma as never);
+
+    await service.approve(OWNER, PI_ID);
+
+    expect(prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'row1' },
+      data: { status: 'APPROVED', piPaymentId: PI_ID, amount: 0.0001, memo: 'cheap' },
+    });
+  });
+
+  it('complete records what Pi charged on both the linked and the recovery path', async () => {
+    const charged = { amount: 0.0001, memo: 'cheap', metadata: { paymentIdentifier: 'row9' } };
+    const linked = makePrisma({
+      payment: { findFirst: vi.fn().mockResolvedValue({ id: 'row1', userId: OWNER, status: 'APPROVED' }) },
+    });
+    fetchSpy.mockResolvedValue(piOk(charged));
+    await new PaymentsService(linked as never).complete(OWNER, PI_ID, 'tx1');
+    expect(linked.payment.updateMany).toHaveBeenCalledWith({
+      where: { piPaymentId: PI_ID, userId: OWNER, status: { not: 'COMPLETED' } },
+      data: { status: 'COMPLETED', txid: 'tx1', amount: 0.0001, memo: 'cheap' },
+    });
+
+    const recovered = makePrisma({
+      payment: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        updateMany: vi.fn().mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 }),
+      },
+    });
+    await new PaymentsService(recovered as never).complete(OWNER, PI_ID, 'tx1');
+    expect(recovered.payment.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'row9', userId: OWNER, status: { not: 'COMPLETED' } },
+      data: { status: 'COMPLETED', txid: 'tx1', piPaymentId: PI_ID, amount: 0.0001, memo: 'cheap' },
+    });
+  });
+
   it('an unlinked payment still completes for its owner (no false rejection)', async () => {
     const prisma = makePrisma({ payment: { findFirst: vi.fn().mockResolvedValue(null) } });
     const service = new PaymentsService(prisma as never);

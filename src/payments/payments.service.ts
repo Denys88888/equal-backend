@@ -11,6 +11,26 @@ import { recordPayment } from '../common/payment-diagnostics';
 
 const PI_API_BASE = 'https://api.minepi.com/v2';
 
+type PiPayment = {
+  amount?: unknown;
+  memo?: unknown;
+  metadata?: { paymentIdentifier?: string };
+};
+
+/**
+ * What Pi actually charged, to overwrite on our row. The app creates the row
+ * with an amount and memo of its choosing and then asks Pi for a payment of
+ * its own — so a modified app could book "0.2 Pi, Ask" on our side and pay Pi
+ * 0.0001. Everything that honours a payment (Ask surcharges, tickets, the
+ * admin revenue figures) reads our row, so the row must say what Pi says.
+ */
+function charged(pi: PiPayment): { amount?: number; memo?: string } {
+  return {
+    ...(typeof pi.amount === 'number' && Number.isFinite(pi.amount) ? { amount: pi.amount } : {}),
+    ...(typeof pi.memo === 'string' ? { memo: pi.memo } : {}),
+  };
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
@@ -98,9 +118,7 @@ export class PaymentsService {
       });
       throw new InternalServerErrorException(`Pi approve failed ${piRes.status}: ${body}`);
     }
-    const piData = JSON.parse(body) as {
-      metadata?: { paymentIdentifier?: string };
-    };
+    const piData = JSON.parse(body) as PiPayment;
 
     // The client puts our row id in metadata.paymentIdentifier at createPayment
     // time, and Pi echoes the metadata back here. That echo is the ONLY link
@@ -128,7 +146,7 @@ export class PaymentsService {
       }
       await this.prisma.payment.update({
         where: { id: payment.id },
-        data: { status: 'APPROVED', piPaymentId: paymentId },
+        data: { status: 'APPROVED', piPaymentId: paymentId, ...charged(piData) },
       });
     } else {
       console.error(`[payments] approve: no local row for piId=${paymentId} — cannot mark APPROVED`);
@@ -332,9 +350,7 @@ export class PaymentsService {
       });
       throw new InternalServerErrorException(`Pi complete failed ${piRes.status}: ${body}`);
     }
-    const piData = JSON.parse(body) as {
-      metadata?: { paymentIdentifier?: string };
-    };
+    const piData = JSON.parse(body) as PiPayment;
 
     // Normally approve() has already stamped piPaymentId. The metadata fallback
     // covers a payment whose approve call didn't link (older rows, or an approve
@@ -344,7 +360,7 @@ export class PaymentsService {
     // mutate someone else's row even on the recovery path below.
     const updated = await this.prisma.payment.updateMany({
       where: { piPaymentId: paymentId, userId, status: { not: 'COMPLETED' } },
-      data: { status: 'COMPLETED', txid },
+      data: { status: 'COMPLETED', txid, ...charged(piData) },
     });
 
     let linked = updated.count > 0;
@@ -353,7 +369,7 @@ export class PaymentsService {
       if (ourId) {
         const recovered = await this.prisma.payment.updateMany({
           where: { id: ourId, userId, status: { not: 'COMPLETED' } },
-          data: { status: 'COMPLETED', txid, piPaymentId: paymentId },
+          data: { status: 'COMPLETED', txid, piPaymentId: paymentId, ...charged(piData) },
         });
         linked = recovered.count > 0;
         console.error(

@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { BannedGuard } from './banned.guard';
 import { ProfanityService } from './profanity.service';
 import { LoggerService } from './logger.service';
+import { ClientErrorsController } from './client-errors.controller';
 
 /**
  * Global so BannedGuard / ProfanityService / LoggerService can be injected
@@ -9,6 +10,7 @@ import { LoggerService } from './logger.service';
  */
 @Global()
 @Module({
+  controllers: [ClientErrorsController],
   providers: [BannedGuard, ProfanityService, LoggerService],
   exports: [BannedGuard, ProfanityService, LoggerService],
 })
