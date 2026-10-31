@@ -102,6 +102,7 @@ export class MessagesService {
     }));
     return {
       messages: normalized,
+      muted: (match.mutedBy ?? []).includes(userId),
       hasMore: messages.length === limit,
       partnerId,
       matchName: partner?.name || '',
@@ -166,7 +167,8 @@ export class MessagesService {
         : msgType === 'GIFT' ? 'msg_gift' as const
         : 'msg_new' as const;
     const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { name: true } });
-    this.push.sendToUser(recipientId, {
+    const muted = (match.mutedBy ?? []).includes(recipientId);
+    if (!muted) this.push.sendToUser(recipientId, {
       title: 'msg_title',
       body,
       params: { name: sender?.name },
@@ -174,6 +176,21 @@ export class MessagesService {
       tag: `msg-${matchId}`,
     }, 'messages').catch(() => {});
 
-    return message;
+    // message:new only reaches people with this chat open; the app's bell
+    // listens on the recipient's own room, so it never heard about a message.
+    if (!muted) {
+      this.gateway.server?.to(`user:${recipientId}`).emit('message:notify', {
+        matchId,
+        senderName: sender?.name ?? '',
+        type: msgType,
+        giftType: message.giftType,
+        preview: msgType === 'TEXT' ? (content.length > 80 ? content.slice(0, 80) + '…' : content) : null,
+      });
+    }
+
+    // Same shape as getMessages, so the sender's app can show its own message
+    // straight away: the bare row has no `sender`/`timestamp`, and the app drew
+    // a just-sent text on the partner's side under an empty date until reload.
+    return { ...message, sender: 'me' as const, timestamp: message.createdAt };
   }
 }

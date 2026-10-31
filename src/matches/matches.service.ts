@@ -90,6 +90,24 @@ export class MatchesService {
     });
   }
 
+  /**
+   * Mutes or unmutes one conversation for the caller. The chat's "Mute
+   * notifications" item used to only show a toast — pushes kept coming.
+   */
+  async setMuted(matchId: string, userId: string, muted: boolean) {
+    const match = await this.prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.user1Id !== userId && match.user2Id !== userId) {
+      throw new ForbiddenException('Not your match');
+    }
+    const others = (match.mutedBy ?? []).filter((id) => id !== userId);
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: { mutedBy: muted ? [...others, userId] : others },
+    });
+    return { muted };
+  }
+
   async unmatch(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({ where: { id: matchId } });
     if (!match) throw new NotFoundException('Match not found');

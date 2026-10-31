@@ -265,6 +265,8 @@ model Match {
   id        String   @id @default(cuid())
   user1Id   String
   user2Id   String
+  /// Participants who muted this conversation: no push for its messages.
+  mutedBy   String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

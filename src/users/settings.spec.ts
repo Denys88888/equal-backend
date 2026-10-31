@@ -80,6 +80,7 @@ describe('ProfilesService.discover — Ghost Mode', () => {
     const prisma = {
       swipeAction: { findMany: vi.fn().mockResolvedValue([]) },
       profile: { findUnique: vi.fn().mockResolvedValue(null) },
+      match: { findMany: vi.fn().mockResolvedValue([]) },
       user: { findMany: userFindMany },
     };
     const service = new ProfilesService(prisma as never, {} as never, {} as never, {} as never);
@@ -104,5 +105,21 @@ describe('DailyMatchService — Ghost Mode', () => {
 
     const where = (userFindMany.mock.calls[0][0] as { where: Record<string, unknown> }).where;
     expect(where.ghostMode).toBe(false);
+  });
+});
+
+describe('ProfilesService.discover — existing matches', () => {
+  it('leaves out people the user is already matched with', async () => {
+    const userFindMany = vi.fn().mockResolvedValue([]);
+    const prisma = {
+      swipeAction: { findMany: vi.fn().mockResolvedValue([]) },
+      profile: { findUnique: vi.fn().mockResolvedValue(null) },
+      // A Daily Match both kept: a Match with no swipes behind it.
+      match: { findMany: vi.fn().mockResolvedValue([{ user1Id: 'partner', user2Id: 'me' }]) },
+      user: { findMany: userFindMany },
+    };
+    const service = new ProfilesService(prisma as never, {} as never, {} as never, {} as never);
+    await service.discover('me', {});
+    expect(userFindMany.mock.calls[0][0].where.id.notIn).toContain('partner');
   });
 });

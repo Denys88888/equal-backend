@@ -31,7 +31,7 @@ export class ProfilesService {
 
   async discover(userId: string, filters: Record<string, string>) {
     const excludeIds = [userId];
-    const [alreadySwiped, blockedMe, myProfile] = await Promise.all([
+    const [alreadySwiped, blockedMe, myProfile, myMatches] = await Promise.all([
       this.prisma.swipeAction.findMany({ where: { userId }, select: { targetId: true } }),
       // People who blocked me must not surface in my deck either
       this.prisma.swipeAction.findMany({
@@ -42,9 +42,17 @@ export class ProfilesService {
         where: { userId },
         select: { interests: true, latitude: true, longitude: true, gender: true, lookingFor: true },
       }),
+      // A Daily Match that both kept becomes a Match without any swipe, so
+      // swipes alone let that person back into the deck — where liking them
+      // replayed "It's a match!" for a conversation that already existed.
+      this.prisma.match.findMany({
+        where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+        select: { user1Id: true, user2Id: true },
+      }),
     ]);
     excludeIds.push(...alreadySwiped.map((s: { targetId: string }) => s.targetId));
     excludeIds.push(...blockedMe.map((s: { userId: string }) => s.userId));
+    excludeIds.push(...myMatches.map((m: { user1Id: string; user2Id: string }) => (m.user1Id === userId ? m.user2Id : m.user1Id)));
 
     const myInterests = new Set(myProfile?.interests ?? []);
     const norm = (s: string) => s.trim().toLowerCase();

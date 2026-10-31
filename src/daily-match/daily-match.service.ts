@@ -9,6 +9,8 @@ import { isDue, localDayStart, intersect, genderCompatible, languageCompatible }
 
 /** Memo the extra-match Pi payment is created with; must match the client. */
 export const EXTRA_MATCH_MEMO = 'Extra Daily Match';
+/** Price of an extra match; the app asks Pi for this amount. */
+export const EXTRA_MATCH_PRICE = 0.2;
 /** How long a fresh Daily Match conversation stays open. */
 const CHAT_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Pairs are not repeated inside this window. */
@@ -272,7 +274,9 @@ export class DailyMatchService {
   /** A completed extra-match payment that has not been turned into a match yet. */
   private findUnusedExtraPayment(userId: string) {
     return this.prisma.payment.findFirst({
-      where: { userId, status: 'COMPLETED', memo: EXTRA_MATCH_MEMO, consumedAt: null },
+      // Amount is what Pi charged (see PaymentsService); the memo alone let a
+      // payment of any size buy a match.
+      where: { userId, status: 'COMPLETED', memo: EXTRA_MATCH_MEMO, consumedAt: null, amount: { gte: EXTRA_MATCH_PRICE - 1e-6 } },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -75,12 +75,13 @@ describe('EventsService — paid-ticket gate', () => {
 
     await service.rsvp('e1', 'user-1', 'going');
 
-    // The payment has to be this user's, for this event, and actually completed
-    // — a PENDING row must never open the door.
+    // The payment has to be this user's, for this event, actually completed —
+    // a PENDING row must never open the door — and cover the price.
     expect(prisma.payment.findFirst.mock.calls[0][0].where).toEqual({
       userId: 'user-1',
       eventId: 'e1',
       status: 'COMPLETED',
+      amount: { gte: 5 - 1e-6 },
     });
     expect(prisma.eventRsvp.upsert).toHaveBeenCalled();
   });

@@ -96,7 +96,10 @@ export class EventsService {
       // so every paid event was effectively free. Require a completed Pi payment.
       if (event.price > 0) {
         const paid = await this.prisma.payment.findFirst({
-          where: { userId, eventId, status: 'COMPLETED' },
+          // Our row's amount is what Pi charged (PaymentsService overwrites it
+          // on approve/complete); without the amount check any completed
+          // payment tagged with this event — 0.0001 Pi — bought a ticket.
+          where: { userId, eventId, status: 'COMPLETED', amount: { gte: event.price - 1e-6 } },
           select: { id: true },
         });
         if (!paid) throw new BadRequestException('Payment required for this event');
