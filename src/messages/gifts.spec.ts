@@ -10,19 +10,26 @@ import { countGiftsReceived, GIFT_PRICES } from './gift-catalog';
  * a profile's gift count meant nothing.
  */
 
-function messages(redeem = vi.fn().mockResolvedValue(undefined)) {
+function messages(redeem = vi.fn().mockResolvedValue(undefined), sparks = 3) {
   const create = vi.fn(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: 'm1', createdAt: new Date(), ...data }));
+  let balance = sparks;
+  const updateMany = vi.fn(({ where }: { where: { sparkBalance: { gte: number } } }) => {
+    if (balance < where.sparkBalance.gte) return Promise.resolve({ count: 0 });
+    balance -= 1;
+    return Promise.resolve({ count: 1 });
+  });
+  const update = vi.fn(() => { balance += 1; return Promise.resolve({}); });
   const prisma = {
     match: { findUnique: vi.fn().mockResolvedValue({ id: 'match1', user1Id: 'alice', user2Id: 'bob' }) },
     swipeAction: { findFirst: vi.fn().mockResolvedValue(null) },
     message: { create },
-    user: { findUnique: vi.fn().mockResolvedValue({ name: 'Alice' }) },
+    user: { findUnique: vi.fn(() => Promise.resolve({ name: 'Alice', sparkBalance: balance })), updateMany, update },
   };
   const push = { sendToUser: vi.fn().mockResolvedValue(undefined) };
   const gateway = { server: { to: () => ({ emit: vi.fn() }) } };
   const service = new MessagesService(prisma as never, push as never, gateway as never, { redeemForGift: redeem } as never);
-  return { service, create, redeem };
+  return { service, create, redeem, balance: () => balance };
 }
 
 describe('sending a gift', () => {
@@ -32,11 +39,34 @@ describe('sending a gift', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('sends the free spark without any payment', async () => {
-    const { service, create, redeem } = messages();
-    await service.create('match1', 'alice', 'spark', 'GIFT', 'spark');
+  it('sends the spark without a Pi payment, for one of the sender\'s Sparks', async () => {
+    const { service, create, redeem, balance } = messages(undefined, 3);
+    const msg = await service.create('match1', 'alice', 'spark', 'GIFT', 'spark');
     expect(redeem).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalled();
+    expect(balance()).toBe(2);
+    expect(msg).toMatchObject({ sparkBalance: 2 });
+  });
+
+  it('refuses the spark gift with no Sparks left, and creates nothing', async () => {
+    const { service, create, balance } = messages(undefined, 0);
+    await expect(service.create('match1', 'alice', 'spark', 'GIFT', 'spark')).rejects.toThrow(/Not enough sparks/);
+    expect(create).not.toHaveBeenCalled();
+    expect(balance()).toBe(0);
+  });
+
+  it('gives the Spark back when the gift could not be created', async () => {
+    const m = messages(undefined, 1);
+    m.create.mockRejectedValueOnce(new Error('db down'));
+    await expect(m.service.create('match1', 'alice', 'spark', 'GIFT', 'spark')).rejects.toThrow(/db down/);
+    expect(m.balance()).toBe(1);
+  });
+
+  it('spends no Spark on a text message or a paid gift', async () => {
+    const m = messages(undefined, 2);
+    await m.service.create('match1', 'alice', 'hi');
+    await m.service.create('match1', 'alice', 'rose', 'GIFT', 'rose', 'pi_1');
+    expect(m.balance()).toBe(2);
   });
 
   it('redeems a payment of at least the price before a paid gift is created', async () => {

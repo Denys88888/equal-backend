@@ -136,9 +136,34 @@ export class MessagesService {
         }
       }
     }
-    const message = await this.prisma.message.create({
-      data: { matchId, senderId, content, type: msgType, giftType: msgType === 'GIFT' ? giftType : null },
-    });
+
+    // The Spark gift is "send an earned Spark" but cost nothing. It now spends
+    // one, with the same conditional update as a super-like, so an empty
+    // balance can't send it even from a modified app.
+    const spendsSpark = msgType === 'GIFT' && giftType === 'spark';
+    if (spendsSpark) {
+      const consumed = await this.prisma.user.updateMany({
+        where: { id: senderId, sparkBalance: { gte: 1 } },
+        data: { sparkBalance: { decrement: 1 } },
+      });
+      if (consumed.count === 0) {
+        recordGift(giftType, 'rejected', 'Not enough sparks');
+        throw new BadRequestException('Not enough sparks');
+      }
+    }
+
+    let message: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    try {
+      message = await this.prisma.message.create({
+        data: { matchId, senderId, content, type: msgType, giftType: msgType === 'GIFT' ? giftType : null },
+      });
+    } catch (err) {
+      // The Spark was taken for a gift that was never created — give it back.
+      if (spendsSpark) {
+        await this.prisma.user.update({ where: { id: senderId }, data: { sparkBalance: { increment: 1 } } }).catch(() => {});
+      }
+      throw err;
+    }
     if (msgType === 'GIFT') recordGift(giftType, 'ok', undefined, paymentId);
 
     // Real-time delivery: the REST route is the only path the client uses to send,
@@ -191,6 +216,9 @@ export class MessagesService {
     // Same shape as getMessages, so the sender's app can show its own message
     // straight away: the bare row has no `sender`/`timestamp`, and the app drew
     // a just-sent text on the partner's side under an empty date until reload.
-    return { ...message, sender: 'me' as const, timestamp: message.createdAt };
+    const sparkBalance = spendsSpark
+      ? (await this.prisma.user.findUnique({ where: { id: senderId }, select: { sparkBalance: true } }))?.sparkBalance ?? 0
+      : undefined;
+    return { ...message, sender: 'me' as const, timestamp: message.createdAt, ...(sparkBalance !== undefined ? { sparkBalance } : {}) };
   }
 }
