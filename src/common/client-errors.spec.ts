@@ -23,3 +23,14 @@ describe('client error reports', () => {
     expect(recent[1].message).toBe('boom 11');
   });
 });
+
+describe('client error log across restarts', () => {
+  it('restores what was saved, and ignores a bad row', async () => {
+    const { restoreClientErrors, clientErrorDiagnostics } = await import('./client-errors');
+    restoreClientErrors(JSON.stringify({ total: 42, recent: [{ at: 'x', kind: 'restart', message: 'died', where: '#/chat/:id', device: 'iOS 18.7' }] }));
+    expect(clientErrorDiagnostics().total).toBe(42);
+    expect(clientErrorDiagnostics().recent[0]).toMatchObject({ kind: 'restart', where: '#/chat/:id' });
+    restoreClientErrors('{not json');
+    expect(clientErrorDiagnostics().total).toBe(42);
+  });
+});

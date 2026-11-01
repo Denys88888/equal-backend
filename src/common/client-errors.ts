@@ -53,3 +53,21 @@ export function recordClientError(e: { kind?: unknown; message?: unknown; where?
 export function clientErrorDiagnostics() {
   return { total, recent };
 }
+
+/**
+ * Kept in memory, the log was wiped by every deploy — a white screen reported
+ * minutes before a release was gone by the time anyone looked. It is saved
+ * (AppSetting) after each report and restored at start.
+ */
+export const CLIENT_ERRORS_KEY = 'client_errors';
+
+export function restoreClientErrors(saved: string | null | undefined) {
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved) as { total?: number; recent?: ClientError[] };
+    if (Array.isArray(parsed.recent)) {
+      recent.splice(0, recent.length, ...parsed.recent.slice(0, KEEP));
+      total = typeof parsed.total === 'number' ? parsed.total : recent.length;
+    }
+  } catch { /* a bad row is just an empty log */ }
+}
