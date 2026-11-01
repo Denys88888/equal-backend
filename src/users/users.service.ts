@@ -74,11 +74,17 @@ export class UsersService {
     const count = await this.prisma.photo.count({ where: { userId } });
     // The onboarding UI caps this at 9; nothing enforced it server-side.
     if (count >= 9) throw new ForbiddenException('Photo limit reached (max 9)');
-    if (isMain) {
-      await this.prisma.photo.updateMany({ where: { userId }, data: { isMain: false } });
+    // "Main" means two things across the API: Photo.isMain (chats, clubs, Ask)
+    // and the first photo by order (Discover, profiles). A new main photo was
+    // created last in order, so chats showed it while Discover still led with
+    // the old one. It now goes first in both senses; the very first photo is
+    // main even when not asked for.
+    const main = isMain || count === 0;
+    if (main) {
+      await this.prisma.photo.updateMany({ where: { userId }, data: { isMain: false, order: { increment: 1 } } });
     }
     const photo = await this.prisma.photo.create({
-      data: { userId, url, isMain, order: count },
+      data: { userId, url, isMain: main, order: main ? 0 : count },
     });
     await this.rewards.refreshProfileCompletion(userId);
     return photo;
@@ -272,10 +278,11 @@ export class UsersService {
     return user;
   }
 
+  /** New display order; the first photo becomes the main one everywhere. */
   async reorderPhotos(userId: string, photoIds: string[]) {
     await Promise.all(
       photoIds.map((id, order) =>
-        this.prisma.photo.updateMany({ where: { id, userId }, data: { order } }),
+        this.prisma.photo.updateMany({ where: { id, userId }, data: { order, isMain: order === 0 } }),
       ),
     );
     return this.prisma.photo.findMany({ where: { userId }, orderBy: { order: 'asc' } });
